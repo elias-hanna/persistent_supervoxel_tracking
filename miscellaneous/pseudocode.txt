@@ -1,0 +1,29 @@
+main:
+    cloud <- output_camera(0)
+    octree(cloud)
+    tant que caméra donne cloud:
+        new_cloud <- output_camera(t)
+        new_octree(new_cloud)
+        handle_leaves(new_octree, octree)
+        global_label_check(octree)
+        supervoxel on unlabeled cloud
+
+handle_leaves:
+    pour chaque nouvelle feuille de new_octree:
+        // Flag new leaves as unlabeled, to insert calculate adjacency relations to existing leaves
+        insert_in_octree(new_octree, octree)
+
+    pour chaque feuille ayant disparu:
+        si censée être visible depuis la caméra:
+            supprimer de octree
+        sinon:
+            rien, bloquée dans octree
+    
+    pour chaque autre feuille(existant dans octree et new_octree):
+        if(distance(octree(feuille), new_octree(feuille)) > seuil):
+            enleve le label
+
+global_label_check:
+    pour chaque supervoxel:
+        si la moitié de ses feuilles on perdu leur label:
+            supprimer tout les labels (detruire le supervoxel)

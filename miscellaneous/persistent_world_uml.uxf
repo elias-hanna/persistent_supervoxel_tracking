@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?><diagram program="umlet" version="13.3">
+  <zoom_level>7</zoom_level>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>448</x>
+      <y>245</y>
+      <w>322</w>
+      <h>140</h>
+    </coordinates>
+    <panel_attributes>Supervoxel&lt;PointT&gt;
+--
+_typedefs:_
++Ptr: boost::shared_ptr&lt;Supervoxel&lt;PointT&gt; &gt;
++ConstPtr: boost::shared_ptr&lt;const Supervoxel&lt;PointT&gt; &gt;
+--
++normal_: pcl::Normal
++centroid_: pcl::PointXYZRGBA
++voxels_: pcl::PointCloud&lt;PointT&gt;::Ptr
++normals_: pcl::PointCloud&lt;Normal&gt;::Ptr
+--
++Supervoxel()
++getCentroidPoint(centroid_arg: pcl::PointXYZRGBA&amp;): void
++getCentroidPointNormal(normal_arg: pcl::PointNormal&amp;): void</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>448</x>
+      <y>448</y>
+      <w>322</w>
+      <h>140</h>
+    </coordinates>
+    <panel_attributes>SequentialSupervoxel&lt;PointT&gt;
+--
+_typedefs:_
++CentroidT: PointT 
++VoxelT: PointT 
++Ptr: boost::shared_ptr&lt;SequentialSV&gt;
++ConstPtr: boost::shared_ptr&lt;const SequentialSV&gt; 
+--
+--
++SequentialSupervoxel()</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>70</x>
+      <y>448</y>
+      <w>329</w>
+      <h>308</h>
+    </coordinates>
+    <panel_attributes>SequentialVoxelData
+--
++previous_xyz_: Eigen::Vector3f
++previous_rgb_: Eigen::Vector3f
++previous_normal_: Eigen::Vector4f
++previous_curvature_: float
++new_leaf_: bool
++has_changed_: bool
++frame_occluded_: int
+--
++isNew
++setNew
++isChanged
++setChanged</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>70</x>
+      <y>259</y>
+      <w>329</w>
+      <h>133</h>
+    </coordinates>
+    <panel_attributes>VoxelData
+--
++xyz_: Eigen::Vector3f
++rgb_: Eigen::Vector3f
++normal_: Eigen::Vector4f
++curvature_: float
++distance_: float
++idx_: int
++owner_: SupervoxelHelper
+--
++getPoint(point_arg: PointT&amp;): void
++getNormal(normal_arg: Normal&amp;): void
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>623</x>
+      <y>378</y>
+      <w>21</w>
+      <h>84</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;&lt;-</panel_attributes>
+    <additional_attributes>10.0;10.0;10.0;100.0</additional_attributes>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>217</x>
+      <y>385</y>
+      <w>21</w>
+      <h>77</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;&lt;-</panel_attributes>
+    <additional_attributes>10.0;10.0;10.0;90.0</additional_attributes>
+  </element>
+</diagram>

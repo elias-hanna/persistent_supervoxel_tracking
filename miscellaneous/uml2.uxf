@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?><diagram program="umlet" version="13.3">
+  <zoom_level>6</zoom_level>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>102</x>
+      <y>282</y>
+      <w>636</w>
+      <h>192</h>
+    </coordinates>
+    <panel_attributes>PersistentSupervoxelClustering
+--
+-new_adjacency_octree_: pcl::octree::OctreePointCloudAdjacency&lt;PointT, pcl::octree::OctreePointCloudAdjacencyContainer&lt;PointT, VoxelData&gt; &gt;::Ptr
+--
++handleChanges(): void
++global_label_check(): void
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>UMLClass</id>
+    <coordinates>
+      <x>336</x>
+      <y>120</y>
+      <w>132</w>
+      <h>30</h>
+    </coordinates>
+    <panel_attributes>SupervoxelClustering
+--
+--
+</panel_attributes>
+    <additional_attributes/>
+  </element>
+  <element>
+    <id>Relation</id>
+    <coordinates>
+      <x>396</x>
+      <y>144</y>
+      <w>18</w>
+      <h>150</h>
+    </coordinates>
+    <panel_attributes>lt=&lt;&lt;&lt;-</panel_attributes>
+    <additional_attributes>10.0;10.0;10.0;230.0</additional_attributes>
+  </element>
+</diagram>
