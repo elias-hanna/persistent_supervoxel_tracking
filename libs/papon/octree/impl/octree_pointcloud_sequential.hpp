@@ -56,7 +56,6 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
  
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::addPointsFromInputCloud ()

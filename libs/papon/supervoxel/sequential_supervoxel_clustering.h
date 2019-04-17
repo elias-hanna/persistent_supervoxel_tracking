@@ -115,9 +115,13 @@ namespace pcl
             new_leaf_ (true),
             has_changed_ (false),
             frame_occluded_ (0),
-            label_(-1)
+            label_ (-1)
           {
-            this->idx_ = -1;
+            idx_ = -1;
+            // Initialize previous state of the voxel
+            previous_xyz_ = xyz_;
+            previous_rgb_ = rgb_;
+            previous_normal_ = normal_;
           }
 
           bool
@@ -137,9 +141,17 @@ namespace pcl
           {
             new_leaf_ = false;
             has_changed_ = false;
-            this->idx_ = -1;
+            idx_ = -1;
+            // Update the previous state of the voxel
+            previous_xyz_ = xyz_;
+            previous_rgb_ = rgb_;
+            previous_normal_ = normal_;
             // owner_ = 0;
           }
+
+          // Use the methods from VoxelData
+          using SupervoxelClustering<PointT>::VoxelData::getPoint;
+          using SupervoxelClustering<PointT>::VoxelData::getNormal;
 
           // Use the attributes from VoxelData
           using SupervoxelClustering<PointT>::VoxelData::idx_;
@@ -148,6 +160,12 @@ namespace pcl
           using SupervoxelClustering<PointT>::VoxelData::normal_;
           using SupervoxelClustering<PointT>::VoxelData::curvature_;
           using SupervoxelClustering<PointT>::VoxelData::distance_;
+
+          // Used by the difference function
+          Eigen::Vector3f previous_xyz_;
+          Eigen::Vector3f previous_rgb_;
+          Eigen::Vector4f previous_normal_;
+
           // New attributes
           bool has_changed_, new_leaf_;
           int frame_occluded_;
@@ -233,11 +251,6 @@ namespace pcl
       void
       setUseSingleCameraTransform (bool val);
 
-      void
-      setSeedPruneRadius (float radius)
-      {
-        seed_prune_radius_ = radius;
-      }
       /** \brief Set to ignore input normals and calculate normals internally
        *  \note Default is False - ie, SupervoxelClustering will use normals provided in PointT if there are any
        *  \note You should only need to set this if eg PointT=PointXYZRGBNormal but you don't want to use the normals it contains
@@ -268,9 +281,6 @@ namespace pcl
       virtual void
       setNormalCloud (typename NormalCloudT::ConstPtr normal_cloud);
 
-      void
-      buildVoxelCloud ();
-
       pcl::PointCloud<pcl::PointXYZL>::Ptr
       getLabeledCloud () const;
 
@@ -283,42 +293,53 @@ namespace pcl
       pcl::PointCloud<pcl::PointXYZRGBA>::Ptr
       getColoredCloud () const;
 
+      /** \brief Returns a deep copy of the voxel centroid cloud */
+      typename pcl::PointCloud<PointT>::Ptr
+      getVoxelCentroidCloud () const;
+
+      /** \brief Returns a deep copy of the voxel centroid cloud */
+      typename pcl::PointCloud<PointT>::Ptr
+      getUnlabeledVoxelCentroidCloud () const;
+
+      /** \brief Gets the adjacency list (Boost Graph library) which gives connections between supervoxels
+       *  \param[out] adjacency_list_arg BGL graph where supervoxel labels are vertices, edges are touching relationships
+       */
       void
       getSupervoxelAdjacency (std::multimap<uint32_t, uint32_t> &label_adjacency) const;
 
-    public:
+    private:
+      /** \brief This method initializes the label_colors_ vector (assigns random colors to labels)
+       * \note Checks to see if it is already big enough - if so, does not reinitialize it
+       */
+      void
+      initializeLabelColors ();
 
+      /** \brief Init the computation, update the sequential octree, perform global check to see wether supervoxel have changed
+       * more than their half and finally compute the voxel data to be used to determine the supervoxel seeds
+       */
+      void
+      buildVoxelCloud ();
 
-      /** \brief Returns a deep copy of the voxel centroid cloud */
-      template<typename PointOutT>
-      typename pcl::PointCloud<PointOutT>::Ptr
-      getVoxelCentroidCloud () const
-      {
-        typename pcl::PointCloud<PointOutT>::Ptr centroid_copy (new pcl::PointCloud<PointOutT>);
-        copyPointCloud (*voxel_centroid_cloud_, *centroid_copy);
-        return centroid_copy;
-      }
+      /** \brief Update the sequential octree, perform global check to see wether supervoxel have changed
+       * more than their half and finally compute the voxel data to be used to determine the supervoxel seeds
+       */
+      bool
+      prepareForSegmentation ();
 
-      /** \brief Returns a deep copy of the unlabeled voxel centroid cloud */
-      template<typename PointOutT>
-      typename pcl::PointCloud<PointOutT>::Ptr
-      getUnlabeledVoxelCentroidCloud () const
-      {
-        typename pcl::PointCloud<PointOutT>::Ptr centroid_copy (new pcl::PointCloud<PointOutT>);
-        copyPointCloud (*unlabeled_voxel_centroid_cloud_, *centroid_copy);
-        return centroid_copy;
-      }
+      /** \brief This method unlabels changed voxels between two frames and also unlabel more than half
+       * changing supervoxels
+       */
+      void
+      globalCheck ();
 
-      typedef boost::adjacency_list<boost::setS, boost::setS, boost::undirectedS, uint32_t, float> VoxelAdjacencyList;
-      typedef VoxelAdjacencyList::vertex_descriptor VoxelID;
-      typedef VoxelAdjacencyList::edge_descriptor EdgeID;
+      /** \brief Compute the voxel data (index of each voxel in the octree and normal of each voxel) */
+      void
+      computeVoxelData ();
 
-
-
-    protected:
-
-      bool use_single_camera_transform_;
-      float seed_prune_radius_;
+      /** \brief This method compute the normal of each leaf belonging to the sequential octree
+       */
+      void
+      parallelComputeNormals ();
 
       /** \brief Distance function used for comparing voxelDatas */
       float
@@ -332,37 +353,19 @@ namespace pcl
        *  \param[out] seed_indices The selected leaf indices
        */
       void
-      selectInitialSupervoxelSeeds (std::vector<size_t> &seed_indices);
+      selectInitialSupervoxelSeeds (std::vector<int> &seed_indices);
+
       /** \brief This roughly founds the same seeding points as those from the previous frame
        *  \param[out] existing_seed_indices The selected leaf indices
        */
       void
-      getPreviousSeedingPoints(SequentialSVMapT &supervoxel_clusters, std::vector<size_t> &existing_seed_indices);
-      /** \brief This method initializes the label_colors_ vector (assigns random colors to labels)
-       * \note Checks to see if it is already big enough - if so, does not reinitialize it
-       */
-      void
-      initializeLabelColors ();
-      /** \brief This method unlabels changed voxels between two frames and also unlabel more than half
-       * changing supervoxels
-       */
-      void
-      globalCheck();
+      getPreviousSeedingPoints (SequentialSVMapT &supervoxel_clusters, std::vector<int> &existing_seed_indices);
+
       /** \brief This method finds seeding points, then prune the seeds that are too close to existing ones
        * and stores the resulting seeds in seed_indices
        */
       void
-      pruneSeeds(std::vector<size_t> &existing_seed_indices, std::vector<size_t> &seed_indices);
-    private:
-      bool
-      prepareForSegmentation ();
-
-      void
-      computeVoxelData ();
-      /** \brief This method compute the normal of each leaf belonging to the sequential octree
-       */
-      void
-      parallelComputeNormals ();
+      pruneSeeds (std::vector<int> &existing_seed_indices, std::vector<int> &seed_indices);
 
       void
       clearOwnersSetCentroids ();
@@ -370,32 +373,24 @@ namespace pcl
       void
       expandSupervoxelsFast ( int depth );
 
-      int
-      findNeighborMinCurvature (int idx);
-
-
       /** \brief This method appends internal supervoxel helpers to the list based on the provided seed points
        *  \param[in] seed_indices Indices of the leaves to use as seeds
        */
       void
-      appendHelpersFromSeedIndices (std::vector<size_t> &seed_indices);
+      appendHelpersFromSeedIndices (std::vector<int> &seed_indices);
 
       /** \brief Constructs the map of supervoxel clusters from the internal supervoxel helpers */
       void
       makeSupervoxels (std::map<uint32_t,typename SequentialSV<PointT>::Ptr > &supervoxel_clusters);
 
       void
-      createHelpersFromSeedIndices (std::vector<size_t> &seed_indices);
+      createHelpersFromSeedIndices (std::vector<int> &seed_indices);
 
       void
-      addHelpersFromUnlabeledSeedIndices(std::vector<size_t> &seed_indices);
+      addHelpersFromUnlabeledSeedIndices(std::vector<int> &seed_indices);
 
       std::vector<int>
       getAvailableLabels ();
-
-      /** \brief Distance function used for comparing voxelDatas */
-      float
-      voxelDistance (const VoxelT &v1, const VoxelT &v2) const;
 
       /** \brief Stores the resolution used in the octree */
       float resolution_;
@@ -404,7 +399,7 @@ namespace pcl
       float seed_resolution_;
 
       /** \brief Contains a KDtree for the voxelized cloud */
-      typename pcl::search::KdTree<VoxelT>::Ptr voxel_kdtree_;
+      typename pcl::search::KdTree<PointT>::Ptr voxel_kdtree_;
 
       /** \brief Stores the colors used for the superpixel labels*/
       std::vector<uint32_t> label_colors_;
@@ -413,19 +408,36 @@ namespace pcl
       typename OctreeSequentialT::Ptr sequential_octree_;
 
       /** \brief Contains the Voxelized centroid cloud of the unlabeled voxels */
-      typename VoxelCloudT::Ptr unlabeled_voxel_centroid_cloud_;
+      typename PointCloudT::Ptr unlabeled_voxel_centroid_cloud_;
 
       /** \brief Contains the Voxelized centroid Cloud */
-      typename VoxelCloudT::Ptr voxel_centroid_cloud_;
+      typename PointCloudT::Ptr voxel_centroid_cloud_;
+
+      /** \brief Contains the Normals of the input Cloud */
+      typename NormalCloudT::ConstPtr input_normals_;
 
       /** \brief Importance of color in clustering */
       float color_importance_;
+
       /** \brief Importance of distance from seed center in clustering */
       float spatial_importance_;
+
       /** \brief Importance of similarity in normals for clustering */
       float normal_importance_;
+
       /** \brief Option to ignore normals in input Pointcloud. Defaults to false */
       bool ignore_input_normals_;
+
+      /** \brief Whether or not to use the transform compressing depth in Z
+       *  This is only checked if it has been manually set by the user.
+       *  The default behavior is to use the transform for organized, and not for unorganized.
+       */
+      bool use_single_camera_transform_;
+
+      /** \brief Whether to use default transform behavior or not */
+      bool use_default_transform_behaviour_;
+
+
 
       bool prune_close_seeds_;
 
@@ -449,7 +461,9 @@ namespace pcl
           {
               bool operator() (LeafContainerT* const &left, LeafContainerT* const &right) const
               {
-                return left->getData ().idx_ < right->getData ().idx_;
+                const SequentialVoxelData& leaf_data_left = left->getData ();
+                const SequentialVoxelData& leaf_data_right = right->getData ();
+                return leaf_data_left.idx_ < leaf_data_right.idx_;
               }
           };
           typedef std::set<LeafContainerT*, typename SequentialSupervoxelHelper::compareLeaves> LeafSetT;
@@ -477,7 +491,10 @@ namespace pcl
           updateCentroid ();
 
           void
-          getVoxels (typename pcl::PointCloud<VoxelT>::Ptr &voxels) const;
+          getVoxels (typename pcl::PointCloud<PointT>::Ptr &voxels) const;
+
+          void
+          getNormals (typename pcl::PointCloud<Normal>::Ptr &normals) const;
 
           typedef float (SequentialSVClustering::*DistFuncPtr)(const SequentialVoxelData &v1, const SequentialVoxelData &v2);
 
@@ -485,16 +502,43 @@ namespace pcl
           getLabel () const
           { return label_; }
 
+          Eigen::Vector4f
+          getNormal () const
+          { return centroid_.normal_; }
+
+          Eigen::Vector3f
+          getRGB () const
+          { return centroid_.rgb_; }
+
+          Eigen::Vector3f
+          getXYZ () const
+          { return centroid_.xyz_;}
+
+          void
+          getXYZ (float &x, float &y, float &z) const
+          { x=centroid_.xyz_[0]; y=centroid_.xyz_[1]; z=centroid_.xyz_[2]; }
+
+          void
+          getRGB (uint32_t &rgba) const
+          {
+            rgba = static_cast<uint32_t>( centroid_.rgb_[0]) << 16 |
+                                                                static_cast<uint32_t>(centroid_.rgb_[1]) << 8 |
+                                                                                                            static_cast<uint32_t>(centroid_.rgb_[2]);
+          }
+
+          void
+          getNormal (pcl::Normal &normal_arg) const
+          {
+            normal_arg.normal_x = centroid_.normal_[0];
+            normal_arg.normal_y = centroid_.normal_[1];
+            normal_arg.normal_z = centroid_.normal_[2];
+            normal_arg.curvature = centroid_.curvature_;
+          }
+
           void
           getNeighborLabels (std::set<uint32_t> &neighbor_labels) const;
 
-          void
-          getCentroid (CentroidT &centroid_arg) const
-          {
-            centroid_arg = centroid_;
-          }
-
-          CentroidT
+          SequentialVoxelData
           getCentroid () const
           {
             return centroid_;
@@ -506,7 +550,7 @@ namespace pcl
           //Stores leaves
           LeafSetT leaves_;
           uint32_t label_;
-          CentroidT centroid_;
+          SequentialVoxelData centroid_;
           SequentialSVClustering* parent_;
         public:
           //Type VoxelData may have fixed-size Eigen objects inside
@@ -518,6 +562,7 @@ namespace pcl
 
       typedef boost::ptr_list<SequentialSupervoxelHelper> HelperListT;
       HelperListT supervoxel_helpers_;
+
     public:
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   };
