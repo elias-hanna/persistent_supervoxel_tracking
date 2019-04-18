@@ -44,286 +44,306 @@
 #include <pcl/octree/octree_pointcloud.h>
 #include "octree_pointcloud_sequential_container.h"
 // Parallelizer includes
-#include <tbb/tbb.h>
+//#include <tbb/tbb.h>
 // Boost includes
 #include <boost/function.hpp>
 #include <boost/thread/mutex.hpp>
 
 namespace pcl
 { 
-    namespace octree
+  namespace octree
+  {
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /** \brief @b Octree
+     *
+     */
+    //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    template< typename PointT,
+              typename LeafContainerT = OctreePointCloudSequentialContainer <PointT>,
+              typename BranchContainerT = OctreeContainerEmpty >
+    class OctreePointCloudSequential : public OctreePointCloud< PointT, LeafContainerT, BranchContainerT>
     {
-        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        /** \brief @b Octree
-         *
-         */
-        //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-        template< typename PointT,
-                  typename LeafContainerT = OctreePointCloudSequentialContainer <PointT>,
-                  typename BranchContainerT = OctreeContainerEmpty >
-        class OctreePointCloudSequential : public OctreePointCloud< PointT, LeafContainerT, BranchContainerT>
+      public:
+        typedef OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT > OctreeSequentialT;
+        typedef boost::shared_ptr<OctreeSequentialT> Ptr;
+        typedef boost::shared_ptr<const OctreeSequentialT> ConstPtr;
+
+        typedef OctreeBase<LeafContainerT, BranchContainerT> OctreeBaseT;
+        typedef OctreePointCloud<PointT, LeafContainerT, BranchContainerT,OctreeBaseT > OctreePointCloudT;
+        /* REMOVED BECAUSE WE INHERIT FROM OCTREEPOINTCLOUD NOT ADJACENCY */
+        //                typedef OctreePointCloudAdjacency<PointT, LeafContainerT, BranchContainerT > OctreeAdjacencyT;
+
+        typedef typename OctreePointCloudT::LeafNode LeafNode;
+        typedef typename OctreePointCloudT::BranchNode BranchNode;
+
+        typedef pcl::PointCloud<PointT> PointCloudT;
+
+        // iterators are friends
+        friend class OctreeIteratorBase<OctreeSequentialT> ;
+        friend class OctreeDepthFirstIterator<OctreeSequentialT> ;
+        friend class OctreeBreadthFirstIterator<OctreeSequentialT> ;
+        friend class OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> ;
+
+
+        // Octree leaf node iterators
+        //                typedef OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> LeafNodeIterator;
+        //                typedef const OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> ConstLeafNodeIterator;
+
+        //                PCL_DEPRECATED ("Please use leaf_depth_begin () instead.")
+        //                LeafNodeIterator leaf_begin (unsigned int max_depth_arg = 0) { return LeafNodeIterator (this, max_depth_arg); }
+        //                PCL_DEPRECATED ("Please use leaf_depth_end () instead.")
+        //                const LeafNodeIterator leaf_end () { return LeafNodeIterator (this, 0, NULL); }
+
+        //                // The currently valide names
+        //                typedef OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> LeafNodeDepthFirstIterator;
+        //                typedef const OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> ConstLeafNodeDepthFirstIterator;
+
+        //                LeafNodeDepthFirstIterator leaf_depth_begin (unsigned int max_depth_arg = 0u)
+        //                {
+        //                  return LeafNodeDepthFirstIterator (this, max_depth_arg? max_depth_arg : this->octree_depth_);
+        //                }
+
+        //                const LeafNodeDepthFirstIterator leaf_depth_end ()
+        //                {
+        //                  return LeafNodeDepthFirstIterator (this, 0, NULL);
+        //                }
+
+        // Leaf vector - pointers to all leaves
+        typedef std::vector<LeafContainerT*> LeafVectorT;
+        typedef std::vector<boost::shared_ptr<OctreeKey> >  KeyVectorT;
+        // Fast leaf iterators that don't require traversing tree
+        typedef typename LeafVectorT::iterator iterator;
+        typedef typename LeafVectorT::const_iterator const_iterator;
+
+        /* REMOVED BECAUSE WE INHERIT FROM OCTREEPOINTCLOUD NOT ADJACENCY */
+        //        using OctreeAdjacencyT::begin;
+        //        using OctreeAdjacencyT::end;
+        //        using OctreeAdjacencyT::at;
+        inline iterator begin () { return (leaf_vector_.begin ()); }
+        inline iterator end ()   { return (leaf_vector_.end ()); }
+        inline LeafContainerT* at (size_t idx)   { return leaf_vector_.at (idx); }
+
+        //! Numbers of leaves
+        inline size_t size () const { return leaf_vector_.size (); }
+
+        /** \brief Constructor.
+          *
+          * \param[in] resolution_arg  octree resolution at lowest octree level (voxel size) */
+        OctreePointCloudSequential (const double resolution_arg);
+
+
+        /** \brief Empty class destructor. */
+        virtual ~OctreePointCloudSequential ()
         {
-            public:
-                typedef OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT > OctreeSequentialT;
-                typedef boost::shared_ptr<OctreeSequentialT> Ptr;
-                typedef boost::shared_ptr<const OctreeSequentialT> ConstPtr;
+        }
 
-                typedef OctreeBase<LeafContainerT, BranchContainerT> OctreeBaseT;
-                typedef OctreePointCloud<PointT, LeafContainerT, BranchContainerT,OctreeBaseT > OctreePointCloudT;
-                /* REMOVED BECAUSE WE INHERIT FROM OCTREEPOINTCLOUD NOT ADJACENCY */
-//                typedef OctreePointCloudAdjacency<PointT, LeafContainerT, BranchContainerT > OctreeAdjacencyT;
+        /** \brief Adds points from cloud to the octree
+          *
+          * \note This overrides the addPointsFromInputCloud from the OctreePointCloud class */
+        void
+        addPointsFromInputCloud ();
 
-                typedef typename OctreePointCloudT::LeafNode LeafNode;
-                typedef typename OctreePointCloudT::BranchNode BranchNode;
+        /** \brief Defines the size of the bounding box
+         */
+        void
+        defineBoundingBoxOnInputCloud ();
 
-                typedef pcl::PointCloud<PointT> PointCloudT;
+        /** \brief Generates octree key for specified point (uses transform if provided).
+          *
+          * \param[in] point_arg Point to generate key for
+          * \param[out] key_arg Resulting octree key */
+        void
+        genOctreeKeyforPoint (const PointT& point_arg, OctreeKey& key_arg) const;
 
-                // iterators are friends
-                friend class OctreeIteratorBase<OctreeSequentialT> ;
-                friend class OctreeDepthFirstIterator<OctreeSequentialT> ;
-                friend class OctreeBreadthFirstIterator<OctreeSequentialT> ;
-                friend class OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> ;
+        /** \brief Set the difference function which is used to evaluate if a leaf has changed
+          *
+          *  \note Generally, this means checking if the color has changed (and possibly the neighbors)
+          *  \note There is a default implementation provided for OctreePointCloudAdjacencyContainer<PointT,SequentialVoxelData<PointT>>, but it must be set manually:
+          *  \note seq_octree->setDifferenceFunction (boost::bind (&OctreePointCloudSequential::SeqVoxelDataDiff, ptrToSeqOctree, _1));
+          *  \param[in] diff_func A boost:function pointer to the difference function to be used. Should return a normalized (0-1) difference value for the given leaf */
+        void
+        setDifferenceFunction (boost::function<float (const LeafContainerT* leaf)> diff_func)
+        {
+          diff_func_ = diff_func;
+        }
 
+        /** \brief Set the difference threshold for voxel change
+          *
+          * \param[in] threshold_arg Sets the threshold value for determining whether a voxel has changed */
+        void
+        setDifferenceThreshold (const float threshold_arg)
+        {
+          difference_threshold_=threshold_arg;
+        }
 
-                // Octree leaf node iterators
-//                typedef OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> LeafNodeIterator;
-//                typedef const OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> ConstLeafNodeIterator;
+        /** \brief Returns the difference threshold for voxel change
+          *
+          * \returns The difference threshold */
+        float
+        getDifferenceThreshold () const
+        {
+          return difference_threshold_;
+        }
 
-//                PCL_DEPRECATED ("Please use leaf_depth_begin () instead.")
-//                LeafNodeIterator leaf_begin (unsigned int max_depth_arg = 0) { return LeafNodeIterator (this, max_depth_arg); }
-//                PCL_DEPRECATED ("Please use leaf_depth_end () instead.")
-//                const LeafNodeIterator leaf_end () { return LeafNodeIterator (this, 0, NULL); }
+        LeafContainerT*
+        getLeafContainerAtPoint (const PointT& point_arg) const;
 
-//                // The currently valide names
-//                typedef OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> LeafNodeDepthFirstIterator;
-//                typedef const OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> ConstLeafNodeDepthFirstIterator;
+        /** \brief Sets the precision of the occlusion testing
+         *  Lower values mean more testing - the value specifies the interval (in voxels) between occlusion checks on the ray to the camera
+         *  \param[in] occlusion_interval_arg Distance between checks (default is 0.5) in multiples of resolution_ */
+        void
+        setOcclusionTestInterval (const float occlusion_interval_arg)
+        {
+          occlusion_test_interval_ = occlusion_interval_arg;
+        }
 
-//                LeafNodeDepthFirstIterator leaf_depth_begin (unsigned int max_depth_arg = 0u)
-//                {
-//                  return LeafNodeDepthFirstIterator (this, max_depth_arg? max_depth_arg : this->octree_depth_);
-//                }
+        /** \brief Returns the interval for occlusion testing
+          *
+          * \returns The interval */
+        float
+        getOcclusionTestInterval () const
+        {
+          return occlusion_test_interval_;
+        }
 
-//                const LeafNodeDepthFirstIterator leaf_depth_end ()
-//                {
-//                  return LeafNodeDepthFirstIterator (this, 0, NULL);
-//                }
+        /** \brief Sets the number of threads to use
+          *
+          * \param[in] num_thread_arg Number of threads */
+        void
+        setNumberOfThreads (const int num_thread_arg)
+        {
+          threads_ = num_thread_arg;
+        }
 
-                // Leaf vector - pointers to all leaves
-                typedef std::vector<LeafContainerT*> LeafVectorT;
-                typedef std::vector<boost::shared_ptr<OctreeKey> >  KeyVectorT;
-                // Fast leaf iterators that don't require traversing tree
-                typedef typename LeafVectorT::iterator iterator;
-                typedef typename LeafVectorT::const_iterator const_iterator;
+        /** \brief Returns the maximum number of threads being used
+          *
+          * \returns max number of threads */
+        int
+        getNumberOfThreads () const
+        {
+          return threads_;
+        }
 
-                /* REMOVED BECAUSE WE INHERIT FROM OCTREEPOINTCLOUD NOT ADJACENCY */
-                //        using OctreeAdjacencyT::begin;
-                //        using OctreeAdjacencyT::end;
-                //        using OctreeAdjacencyT::at;
-                inline iterator begin () { return (leaf_vector_.begin ()); }
-                inline iterator end ()   { return (leaf_vector_.end ()); }
-                inline LeafContainerT* at (size_t idx)   { return leaf_vector_.at (idx); }
+        /** \brief Returns a cloud containing only *new* voxels
+          *
+          * \returns Cloud same as input type of only new voxels */
+        typename PointCloudT::Ptr
+        getNewVoxelCloud ();
 
-                //! Numbers of leaves
-                inline size_t size () const { return leaf_vector_.size (); }
+        /** \brief Default implementation of leaf differencing function
+          *
+          * \param[in] leaf The leaf to check for difference */
+        static float
+        SeqVoxelDataDiff (const LeafContainerT* leaf);
 
-                /** \brief Constructor.
-                  *
-                  * \param[in] resolution_arg  octree resolution at lowest octree level (voxel size) */
-                OctreePointCloudSequential (const double resolution_arg);
-
-
-                /** \brief Empty class destructor. */
-                virtual ~OctreePointCloudSequential ()
-                {
-                }
-
-                /** \brief Adds points from cloud to the octree
-                  *
-                  * \note This overrides the addPointsFromInputCloud from the OctreePointCloud class */
-                void
-                addPointsFromInputCloud ();
-
-                /** \brief Set the difference function which is used to evaluate if a leaf has changed
-                  *
-                  *  \note Generally, this means checking if the color has changed (and possibly the neighbors)
-                  *  \note There is a default implementation provided for OctreePointCloudAdjacencyContainer<PointT,SequentialVoxelData<PointT>>, but it must be set manually:
-                  *  \note seq_octree->setDifferenceFunction (boost::bind (&OctreePointCloudSequential::SeqVoxelDataDiff, ptrToSeqOctree, _1));
-                  *  \param[in] diff_func A boost:function pointer to the difference function to be used. Should return a normalized (0-1) difference value for the given leaf */
-                void
-                setDifferenceFunction (boost::function<float (const LeafContainerT* leaf)> diff_func)
-                {
-                    diff_func_ = diff_func;
-                }
-
-                /** \brief Set the difference threshold for voxel change
-                  *
-                  * \param[in] threshold_arg Sets the threshold value for determining whether a voxel has changed */
-                void
-                setDifferenceThreshold (const float threshold_arg)
-                {
-                    difference_threshold_=threshold_arg;
-                }
-
-                /** \brief Returns the difference threshold for voxel change
-                  *
-                  * \returns The difference threshold */
-                float
-                getDifferenceThreshold () const
-                {
-                    return difference_threshold_;
-                }
-
-                LeafContainerT*
-                getLeafContainerAtPoint (const PointT& point_arg) const;
-
-                /** \brief Sets the precision of the occlusion testing
-                *  Lower values mean more testing - the value specifies the interval (in voxels) between occlusion checks on the ray to the camera
-                *  \param[in] occlusion_interval_arg Distance between checks (default is 0.5) in multiples of resolution_ */
-                void
-                setOcclusionTestInterval (const float occlusion_interval_arg)
-                {
-                    occlusion_test_interval_ = occlusion_interval_arg;
-                }
-
-                /** \brief Returns the interval for occlusion testing
-                 *
-                 * \returns The interval */
-                float
-                getOcclusionTestInterval () const
-                {
-                    return occlusion_test_interval_;
-                }
-
-                /** \brief Sets the number of threads to use
-                  *
-                  * \param[in] num_thread_arg Number of threads */
-                void
-                setNumberOfThreads (const int num_thread_arg)
-                {
-                    threads_ = num_thread_arg;
-                }
-
-                /** \brief Returns the maximum number of threads being used
-                  *
-                  * \returns max number of threads */
-                int
-                getNumberOfThreads () const
-                {
-                    return threads_;
-                }
-
-                /** \brief Returns a cloud containing only *new* voxels
-                  *
-                  * \returns Cloud same as input type of only new voxels */
-                typename PointCloudT::Ptr
-                getNewVoxelCloud ();
-
-                /** \brief Default implementation of leaf differencing function
-                  *
-                  * \param[in] leaf The leaf to check for difference */
-                static float
-                SeqVoxelDataDiff (const LeafContainerT* leaf);
-
-                /** \brief Sets a point transform (and inverse) used to transform the space of the input cloud.
-                  *
-                  * This is useful for changing how adjacency is calculated - such as relaxing the adjacency criterion for
-                  * points further from the camera.
-                  *
-                  * \param[in] transform_func A boost:function pointer to the transform to be used. The transform must have one
-                  * parameter (a point) which it modifies in place. */
-                void
-                setTransformFunction (boost::function<void (PointT &p)> transform_func)
-                {
-                    transform_func_ = transform_func;
-                }
+        /** \brief Sets a point transform (and inverse) used to transform the space of the input cloud.
+          *
+          * This is useful for changing how adjacency is calculated - such as relaxing the adjacency criterion for
+          * points further from the camera.
+          *
+          * \param[in] transform_func A boost:function pointer to the transform to be used. The transform must have one
+          * parameter (a point) which it modifies in place. */
+        void
+        setTransformFunction (boost::function<void (PointT &p)> transform_func)
+        {
+          transform_func_ = transform_func;
+        }
 
 
-            protected:
-                /** \brief Tests whether input leaf-key pair is occluded from the camera view point
-                  *
-                  * \param[in] leaf_key_pair Leaf-Key pair to test for
-                  * \param[in] camera_key Key which specifies the camera position
-                  * \returns 0 if path to camera is free, otherwise distance to occluder (in # of voxels) */
-                std::pair<float, LeafContainerT*>
-                testForOcclusion (boost::shared_ptr<OctreeKey> &key, LeafContainerT *leaf_container ) const;
+      protected:
+        /** \brief Tests whether input leaf-key pair is occluded from the camera view point
+          *
+          * \param[in] leaf_key_pair Leaf-Key pair to test for
+          * \param[in] camera_key Key which specifies the camera position
+          * \returns 0 if path to camera is free, otherwise distance to occluder (in # of voxels) */
+        std::pair<float, LeafContainerT*>
+        testForOcclusion (boost::shared_ptr<OctreeKey> &key, LeafContainerT *leaf_container ) const;
 
-                void
-                parallelAddPoint ();
+        void
+        parallelAddPoint ();
 
-                void
-                parallelUpdate (LeafVectorT* leaves, KeyVectorT* keys, LeafVectorT* delete_leaves, std::vector<OctreeKey>* delete_keys, LeafVectorT* new_leaves, KeyVectorT* new_keys);
+        void
+        parallelUpdate (LeafVectorT* leaves, KeyVectorT* keys, LeafVectorT* delete_leaves, std::vector<OctreeKey>* delete_keys, LeafVectorT* new_leaves, KeyVectorT* new_keys);
 
-                /** \brief Fills in the neighbors fields for new voxels
-                * \param[in] leaf_key_arg Leaf/Key pair of the voxel to compute neighbors for */
-                void
-                computeNeighbors (OctreeKey &key_arg, LeafContainerT* leaf_container);
+        /** \brief Add point at index from input pointcloud dataset to octree.
+          *
+          * \param[in] point_idx_arg The index representing the point in the dataset given by setInputCloud() to be added
+          *
+          * \note This virtual implementation allows the use of a transform function to compute keys. */
+        virtual void
+        addPointIdx (const int point_idx_arg);
 
-                /** \brief Checks if specified leaf has new neighbors
-                  * \param[in] leaf_key_arg Leaf/Key pair of the voxel to check for new neighbors
-                  * \returns True/false whether leaf_key_arg has a new neighbor */
-                bool
-                testForNewNeighbors (const LeafContainerT* leaf_container) const;
+        /** \brief Fills in the neighbors fields for new voxels
+          * \param[in] leaf_key_arg Leaf/Key pair of the voxel to compute neighbors for */
+        void
+        computeNeighbors (OctreeKey &key_arg, LeafContainerT* leaf_container);
 
-                /** \brief Adds a sequential point index from input_ to the tree, threadsafe
-                  * \param[in] point_index_arg index of the point from input_ to add */
-                void
-                addPointSequential (const int point_index_arg);
+        /** \brief Checks if specified leaf has new neighbors
+          * \param[in] leaf_key_arg Leaf/Key pair of the voxel to check for new neighbors
+          * \returns True/false whether leaf_key_arg has a new neighbor */
+        bool
+        testForNewNeighbors (const LeafContainerT* leaf_container) const;
 
-            private:
-                //Stores a pointer to a difference function
-                boost::function<float (const LeafContainerT* leaf)> diff_func_;
+        /** \brief Adds a sequential point index from input_ to the tree, threadsafe
+          * \param[in] point_index_arg index of the point from input_ to add */
+        void
+        addPointSequential (const int point_index_arg);
 
-                /* REMOVED BECAUSE WE INHERIT FROM OCTREEPOINTCLOUD NOT ADJACENCY */
-                //Stores pairs of leaf pointers & octree key ptrs to leaves
-//                using OctreeAdjacencyT::leaf_vector_;
-//                using OctreeAdjacencyT::key_vector_;
-//                using OctreeAdjacencyT::transform_func_;
-                /// Local leaf and key pointer vector used to make iterating through leaves fast.
-                LeafVectorT leaf_vector_;
-                KeyVectorT key_vector_;
-                boost::function<void (PointT &p)> transform_func_;
+      private:
+        //Stores a pointer to a difference function
+        boost::function<float (const LeafContainerT* leaf)> diff_func_;
 
-                LeafVectorT new_leaves_;
-                KeyVectorT new_keys_;
+        /* REMOVED BECAUSE WE INHERIT FROM OCTREEPOINTCLOUD NOT ADJACENCY */
+        //Stores pairs of leaf pointers & octree key ptrs to leaves
+        //                using OctreeAdjacencyT::leaf_vector_;
+        //                using OctreeAdjacencyT::key_vector_;
+        //                using OctreeAdjacencyT::transform_func_;
+        /// Local leaf and key pointer vector used to make iterating through leaves fast.
+        LeafVectorT leaf_vector_;
+        KeyVectorT key_vector_;
+        boost::function<void (PointT &p)> transform_func_;
+
+        LeafVectorT new_leaves_;
+        KeyVectorT new_keys_;
 
 
-                //Stores the maximum difference allowed between sequential voxels before it is called "changed"
-                float difference_threshold_;
+        //Stores the maximum difference allowed between sequential voxels before it is called "changed"
+        float difference_threshold_;
 
-                //Stores the precision for occlusion testing
-                float occlusion_test_interval_;
+        //Stores the precision for occlusion testing
+        float occlusion_test_interval_;
 
-                //Stores the camera position which is used for occlusion testing
-                OctreeKey camera_key_;
+        //Stores the camera position which is used for occlusion testing
+        OctreeKey camera_key_;
 
-                //Mutex lock to prevent simultaneous leaf creation
-                boost::mutex create_mutex_;
+        //Mutex lock to prevent simultaneous leaf creation
+        boost::mutex create_mutex_;
 
-                boost::mutex new_mutex_;
+        boost::mutex new_mutex_;
 
-                boost::mutex delete_mutex_;
+        boost::mutex delete_mutex_;
 
-                //Maximum number of threads to use
-                int threads_;
+        //Maximum number of threads to use
+        int threads_;
 
-                //Stores whether the keys stored in the key vector are currently valid
-                bool stored_keys_valid_;
+        //Stores whether the keys stored in the key vector are currently valid
+        bool stored_keys_valid_;
 
-                int frame_counter_;
-                //Private members from parent OctreePointCloud class
-                using OctreePointCloudT::adoptBoundingBoxToPoint;
-                using OctreePointCloudT::input_;
-                using OctreePointCloudT::resolution_;
-                using OctreePointCloudT::min_x_;
-                using OctreePointCloudT::min_y_;
-                using OctreePointCloudT::min_z_;
-                using OctreePointCloudT::max_x_;
-                using OctreePointCloudT::max_y_;
-                using OctreePointCloudT::max_z_;
-                using OctreeBaseT::octree_depth_;
-                using OctreeBaseT::max_key_;
-        };
-    }
+        int frame_counter_;
+        //Private members from parent OctreePointCloud class
+        using OctreePointCloudT::adoptBoundingBoxToPoint;
+        using OctreePointCloudT::input_;
+        using OctreePointCloudT::resolution_;
+        using OctreePointCloudT::min_x_;
+        using OctreePointCloudT::min_y_;
+        using OctreePointCloudT::min_z_;
+        using OctreePointCloudT::max_x_;
+        using OctreePointCloudT::max_y_;
+        using OctreePointCloudT::max_z_;
+        using OctreeBaseT::octree_depth_;
+        using OctreeBaseT::max_key_;
+    };
+  }
 
 }
 

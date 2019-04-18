@@ -66,10 +66,10 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   {
     OctreePointCloud<PointT, LeafContainerT, BranchContainerT>::addPointsFromInputCloud ();
     LeafContainerT *leaf_container;
-    typename OctreeSequentialT::LeafNodeIterator leaf_itr;
+    typename OctreeSequentialT::LeafNodeDepthFirstIterator leaf_itr;
     leaf_vector_.reserve (this->getLeafCount ());
     key_vector_.reserve (this->getLeafCount ());
-    for ( leaf_itr = this->leaf_begin () ; leaf_itr != this->leaf_end (); ++leaf_itr)
+    for ( leaf_itr = this->leaf_depth_begin () ; leaf_itr != this->leaf_depth_end (); ++leaf_itr)
     {
       boost::shared_ptr<OctreeKey> leaf_key (new OctreeKey);
       *leaf_key = leaf_itr.getCurrentOctreeKey ();
@@ -79,8 +79,9 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
       
       //Run the leaf's compute function
       leaf_container->computeData ();
+      leaf_container->getData ().initLastPoint();
       this->computeNeighbors (*leaf_key, leaf_container);
-      
+
       leaf_vector_.push_back (leaf_container);
       key_vector_.push_back (leaf_key);
     }
@@ -163,9 +164,9 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
     //If no neighbors probably noise - delete 
     if (leaf_container->getNumNeighbors () <= 1)
     {
-      #ifdef _OPENMP
-      #pragma omp critical (delete_leaves)
-      #endif
+//      #ifdef _OPENMP
+//      #pragma omp critical (delete_leaves)
+//      #endif
       {
         delete_leaves.push_back (leaf_container); 
         delete_keys.push_back (*key);
@@ -273,6 +274,106 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
 
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
+pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::defineBoundingBoxOnInputCloud ()
+{
+  float minX = std::numeric_limits<float>::max (), minY = std::numeric_limits<float>::max (), minZ = std::numeric_limits<float>::max ();
+  float maxX = -std::numeric_limits<float>::max(), maxY = -std::numeric_limits<float>::max(), maxZ = -std::numeric_limits<float>::max();
+
+  for (size_t i = 0; i < input_->size (); ++i)
+  {
+    PointT temp (input_->points[i]);
+    if (transform_func_) //Search for point with
+      transform_func_ (temp);
+    if (!pcl::isFinite (temp)) //Check to make sure transform didn't make point not finite
+      continue;
+    if (temp.x < minX)
+      minX = temp.x;
+    if (temp.y < minY)
+      minY = temp.y;
+    if (temp.z < minZ)
+      minZ = temp.z;
+    if (temp.x > maxX)
+      maxX = temp.x;
+    if (temp.y > maxY)
+      maxY = temp.y;
+    if (temp.z > maxZ)
+      maxZ = temp.z;
+  }
+
+  PointT temp;
+  temp.getVector3fMap ().setZero ();
+
+  if (transform_func_)
+  {
+    temp.z = resolution_;
+    transform_func_ (temp);
+  }
+  if (temp.x < minX)
+    minX = temp.x;
+  if (temp.y < minY)
+    minY = temp.y;
+  if (temp.z < minZ)
+    minZ = temp.z;
+  if (temp.x > maxX)
+    maxX = temp.x;
+  if (temp.y > maxY)
+    maxY = temp.y;
+  if (temp.z > maxZ)
+    maxZ = temp.z;
+
+  OctreePointCloudT::defineBoundingBox (minX, minY, minZ, maxX, maxY, maxZ);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
+pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::genOctreeKeyforPoint (const PointT& point_arg,OctreeKey & key_arg) const
+{
+  if (transform_func_)
+  {
+    PointT temp (point_arg);
+    transform_func_ (temp);
+   // calculate integer key for transformed point coordinates
+    if (pcl::isFinite (temp)) //Make sure transformed point is finite - if it is not, it gets default key
+    {
+      key_arg.x = static_cast<unsigned int> ((temp.x - this->min_x_) / this->resolution_);
+      key_arg.y = static_cast<unsigned int> ((temp.y - this->min_y_) / this->resolution_);
+      key_arg.z = static_cast<unsigned int> ((temp.z - this->min_z_) / this->resolution_);
+    }
+    else
+    {
+      key_arg = OctreeKey ();
+    }
+  }
+  else
+  {
+    // calculate integer key for point coordinates
+    key_arg.x = static_cast<unsigned int> ((point_arg.x - this->min_x_) / this->resolution_);
+    key_arg.y = static_cast<unsigned int> ((point_arg.y - this->min_y_) / this->resolution_);
+    key_arg.z = static_cast<unsigned int> ((point_arg.z - this->min_z_) / this->resolution_);
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
+pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::addPointIdx (const int pointIdx_arg)
+{
+  OctreeKey key;
+
+  assert (pointIdx_arg < static_cast<int> (this->input_->points.size ()));
+
+  const PointT& point = this->input_->points[pointIdx_arg];
+  if (!pcl::isFinite (point))
+    return;
+
+  // generate key
+  this->genOctreeKeyforPoint (point, key);
+  // add point to octree at key
+  LeafContainerT* container = this->createLeaf(key);
+  container->addPoint (point);
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> LeafContainerT*
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::getLeafContainerAtPoint (const PointT& point_arg) const
@@ -280,11 +381,10 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   OctreeKey key;
   LeafContainerT* leaf = 0;
   // generate key
-//  OctreeAdjacencyT::genOctreeKeyforPoint (point_arg, key);
-  OctreePointCloudT::genOctreeKeyforPoint (point_arg, key);
+  this->genOctreeKeyforPoint (point_arg, key);
 
   leaf = this->findLeaf (key);
-  
+
   return leaf;
 }
 
@@ -302,7 +402,8 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   
   // generate key - use adjacency function since it possibly has a transform
 //  OctreeAdjacencyT::genOctreeKeyforPoint (point, *key);
-  OctreePointCloudT::genOctreeKeyforPoint (point, *key);
+//  OctreePointCloudT::genOctreeKeyforPoint (point, *key);
+  genOctreeKeyforPoint (point, *key);
 
   // Check if leaf exists in octree at key
   LeafContainerT* container = this->findLeaf(*key);
@@ -347,6 +448,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   int dx_max = (key_arg.x == this->max_key_.x) ? 0 : 1;
   int dy_max = (key_arg.y == this->max_key_.y) ? 0 : 1;
   int dz_max = (key_arg.z == this->max_key_.z) ? 0 : 1;
+
   for (int dx = dx_min; dx <= dx_max; ++dx)
   {
     for (int dy = dy_min; dy <= dy_max; ++dy)
@@ -390,7 +492,8 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   min_z_pt.getVector3fMap ().setZero ();
   min_z_pt.z = 0.3;
 //  OctreeAdjacencyT::genOctreeKeyforPoint (min_z_pt, kinect_min_z);
-  OctreePointCloudT::genOctreeKeyforPoint (min_z_pt, kinect_min_z);
+//  OctreePointCloudT::genOctreeKeyforPoint (min_z_pt, kinect_min_z);
+  genOctreeKeyforPoint (min_z_pt, kinect_min_z);
 
   OctreeKey current_key = *key;
   OctreeKey camera_key;
@@ -399,7 +502,8 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   if (transform_func_)
     temp.z = 0.03f; //Can't set to zero if using a transform.
 //  OctreeAdjacencyT::genOctreeKeyforPoint (temp, camera_key);
-  OctreePointCloudT::genOctreeKeyforPoint (temp, camera_key);
+//  OctreePointCloudT::genOctreeKeyforPoint (temp, camera_key);
+  genOctreeKeyforPoint (temp, camera_key);
   Eigen::Vector3f camera_key_vals (camera_key.x, camera_key.y, camera_key.z);
   Eigen::Vector3f leaf_key_vals (current_key.x,current_key.y,current_key.z);
   
@@ -444,98 +548,98 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   return std::make_pair (0,occluder);
 }
 
-template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
-pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::parallelUpdate ( LeafVectorT* leaves, KeyVectorT* keys, LeafVectorT* delete_leaves, std::vector<OctreeKey>* delete_keys, LeafVectorT* new_leaves, KeyVectorT* new_keys)//typename OctreeSequentialT::Ptr sequential_octree, typename VoxelCloudT::Ptr unlabeled_voxel_centroid_cloud, typename VoxelCloudT::Ptr voxel_centroid_cloud)
-{
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, leaf_vector_.size()),
-                      [=](const tbb::blocked_range<size_t>& r)
-    {
-        for (size_t i = r.begin() ; i < r.end(); ++i)
-        {
-          LeafContainerT *leaf_container = (*leaves)[i];
-          boost::shared_ptr<OctreeKey> key = (*keys)[i];
-          //If no neighbors probably noise - delete
-          if (leaf_container->getNumNeighbors () <= 1)
-          {
-              boost::mutex::scoped_lock (delete_mutex_);
-              delete_leaves->push_back (leaf_container);
-              delete_keys->push_back (*key);
-          }
-          //Check if the leaf had no points observed this frame
-          else if (leaf_container->getPointCounter () == 0)
-          {
-            std::pair<float, LeafContainerT*> occluder_pair = testForOcclusion (key, leaf_container);
-            //If occluded (distance to occluder != 0)
-            if (occluder_pair.first != 0.0f)
-            {
-              //This is basically a test to remove extra voxels caused by objects moving towards the camera
-              if (occluder_pair.first <= 4.0f || (testForNewNeighbors(leaf_container)
-                                                    && leaf_container->getData().frame_occluded_ != occluder_pair.second->getData().frame_occluded_))
-              {
-                boost::mutex::scoped_lock (delete_mutex_);
-                delete_leaves->push_back (leaf_container);
-                delete_keys->push_back (*key);
-              }
-              else //otherwise add it to the current leaves and revert it to last timestep (since current has nothing in it)
-              { //TODO Maybe maintain a separate list of occluded leaves?
-                {
-                  boost::mutex::scoped_lock (new_mutex_);
-                  new_leaves->push_back (leaf_container);
-                  new_keys->push_back (key);
-                }
-                if (leaf_container->getData ().frame_occluded_ == 0)
-                  leaf_container->getData ().frame_occluded_ = frame_counter_;
-                //We don't need to do this anymore since we're using the accumulator
-                //leaf_container->getData ().revertToLastPoint ();
-              }
-            }
-            else //not occluded & not observed safe to delete
-            {
-              boost::mutex::scoped_lock (delete_mutex_);
-              delete_leaves->push_back (leaf_container);
-              delete_keys->push_back (*key);
-            }
-          }
-          else //Existed in previous frame and observed so just update data
-          {
-            {
-              boost::mutex::scoped_lock (new_mutex_);
-              new_leaves->push_back (leaf_container);
-              new_keys->push_back (key);
-            }
-            //Compute the data from the points added to the voxel container
-            leaf_container->computeData ();
-            //Not occluded
-            leaf_container->getData ().frame_occluded_ = 0;
-            //Use the difference function to check if the leaf has changed
-            if ( diff_func_ && diff_func_ (leaf_container) > difference_threshold_)
-            {
-              leaf_container->getData ().setChanged (true);
-              // leaf_container->getData ().label_ = -1;
-            }
-            else
-            {
-              leaf_container->getData ().setChanged (false);
-            }
-          }
-        }
-    }
-    );
-}
+//template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
+//pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::parallelUpdate ( LeafVectorT* leaves, KeyVectorT* keys, LeafVectorT* delete_leaves, std::vector<OctreeKey>* delete_keys, LeafVectorT* new_leaves, KeyVectorT* new_keys)//typename OctreeSequentialT::Ptr sequential_octree, typename VoxelCloudT::Ptr unlabeled_voxel_centroid_cloud, typename VoxelCloudT::Ptr voxel_centroid_cloud)
+//{
+//    tbb::parallel_for(tbb::blocked_range<size_t>(0, leaf_vector_.size()),
+//                      [=](const tbb::blocked_range<size_t>& r)
+//    {
+//        for (size_t i = r.begin() ; i < r.end(); ++i)
+//        {
+//          LeafContainerT *leaf_container = (*leaves)[i];
+//          boost::shared_ptr<OctreeKey> key = (*keys)[i];
+//          //If no neighbors probably noise - delete
+//          if (leaf_container->getNumNeighbors () <= 1)
+//          {
+//              boost::mutex::scoped_lock (delete_mutex_);
+//              delete_leaves->push_back (leaf_container);
+//              delete_keys->push_back (*key);
+//          }
+//          //Check if the leaf had no points observed this frame
+//          else if (leaf_container->getPointCounter () == 0)
+//          {
+//            std::pair<float, LeafContainerT*> occluder_pair = testForOcclusion (key, leaf_container);
+//            //If occluded (distance to occluder != 0)
+//            if (occluder_pair.first != 0.0f)
+//            {
+//              //This is basically a test to remove extra voxels caused by objects moving towards the camera
+//              if (occluder_pair.first <= 4.0f || (testForNewNeighbors(leaf_container)
+//                                                    && leaf_container->getData().frame_occluded_ != occluder_pair.second->getData().frame_occluded_))
+//              {
+//                boost::mutex::scoped_lock (delete_mutex_);
+//                delete_leaves->push_back (leaf_container);
+//                delete_keys->push_back (*key);
+//              }
+//              else //otherwise add it to the current leaves and revert it to last timestep (since current has nothing in it)
+//              { //TODO Maybe maintain a separate list of occluded leaves?
+//                {
+//                  boost::mutex::scoped_lock (new_mutex_);
+//                  new_leaves->push_back (leaf_container);
+//                  new_keys->push_back (key);
+//                }
+//                if (leaf_container->getData ().frame_occluded_ == 0)
+//                  leaf_container->getData ().frame_occluded_ = frame_counter_;
+//                //We don't need to do this anymore since we're using the accumulator
+//                //leaf_container->getData ().revertToLastPoint ();
+//              }
+//            }
+//            else //not occluded & not observed safe to delete
+//            {
+//              boost::mutex::scoped_lock (delete_mutex_);
+//              delete_leaves->push_back (leaf_container);
+//              delete_keys->push_back (*key);
+//            }
+//          }
+//          else //Existed in previous frame and observed so just update data
+//          {
+//            {
+//              boost::mutex::scoped_lock (new_mutex_);
+//              new_leaves->push_back (leaf_container);
+//              new_keys->push_back (key);
+//            }
+//            //Compute the data from the points added to the voxel container
+//            leaf_container->computeData ();
+//            //Not occluded
+//            leaf_container->getData ().frame_occluded_ = 0;
+//            //Use the difference function to check if the leaf has changed
+//            if ( diff_func_ && diff_func_ (leaf_container) > difference_threshold_)
+//            {
+//              leaf_container->getData ().setChanged (true);
+//              // leaf_container->getData ().label_ = -1;
+//            }
+//            else
+//            {
+//              leaf_container->getData ().setChanged (false);
+//            }
+//          }
+//        }
+//    }
+//    );
+//}
 
-template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
-pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::parallelAddPoint ()//typename OctreeSequentialT::Ptr sequential_octree, typename VoxelCloudT::Ptr unlabeled_voxel_centroid_cloud, typename VoxelCloudT::Ptr voxel_centroid_cloud)
-{
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, input_->points.size()),
-                      [=](const tbb::blocked_range<size_t>& r)
-    {
-        for (size_t i = r.begin () ; i != r.end (); ++i)
-        {
-            addPointSequential (static_cast<unsigned int> (i));
-        }
-    }
-    );
-}
+//template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
+//pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::parallelAddPoint ()//typename OctreeSequentialT::Ptr sequential_octree, typename VoxelCloudT::Ptr unlabeled_voxel_centroid_cloud, typename VoxelCloudT::Ptr voxel_centroid_cloud)
+//{
+//    tbb::parallel_for(tbb::blocked_range<size_t>(0, input_->points.size()),
+//                      [=](const tbb::blocked_range<size_t>& r)
+//    {
+//        for (size_t i = r.begin () ; i != r.end (); ++i)
+//        {
+//            addPointSequential (static_cast<unsigned int> (i));
+//        }
+//    }
+//    );
+//}
 
 /*
 ////////////////////////////////////////////////////////////////////////////////

@@ -78,6 +78,7 @@ pcl::SequentialSVClustering<PointT>::setInputCloud (const typename pcl::PointClo
   }
 
   input_ = cloud;
+  sequential_octree_.reset (new OctreeSequentialT (resolution_));
   if (sequential_octree_->size() == 0)
   {
     sequential_octree_.reset (new OctreeSequentialT (resolution_));
@@ -91,8 +92,17 @@ pcl::SequentialSVClustering<PointT>::setInputCloud (const typename pcl::PointClo
     sequential_octree_->setDifferenceThreshold (0.2);
     sequential_octree_->setNumberOfThreads (NUM_THREADS);
     sequential_octree_->setOcclusionTestInterval (0.25f);
+    int j = 0;
+    for(auto point: input_->points)
+    {
+      if(pcl::isFinite(point))
+        j++;
+    }
+    std::cout << "NUMBER OF FINITE POINTS: " << j << std::endl;
+    //67411
+
     sequential_octree_->setInputCloud (cloud);
-    sequential_octree_->defineBoundingBox();//OnInputCloud ();
+    sequential_octree_->defineBoundingBoxOnInputCloud ();
   }
   else
   {
@@ -135,7 +145,7 @@ pcl::SequentialSVClustering<PointT>::extract (std::map<uint32_t,typename Sequent
 
   std::vector<int> seed_indices, existing_seed_indices;
 
-  if(false)//nb_previous_supervoxel_clusters == 0)
+  if(true)//nb_previous_supervoxel_clusters == 0)
   {
     selectInitialSupervoxelSeeds (seed_indices);
     createHelpersFromSeedIndices (seed_indices);
@@ -149,7 +159,7 @@ pcl::SequentialSVClustering<PointT>::extract (std::map<uint32_t,typename Sequent
   double t_seeds = timer_.getTime ();
 
   int max_depth = static_cast<int> (sqrt(2)*seed_resolution_/resolution_);
-  expandSupervoxelsFast (max_depth);
+  expandSupervoxels (max_depth);
 
   double t_iterate = timer_.getTime ();
 
@@ -244,11 +254,9 @@ pcl::SequentialSVClustering<PointT>::computeVoxelData ()
   typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
   typename PointCloudT::iterator cent_cloud_itr = voxel_centroid_cloud_->begin ();
   typename PointCloudT::iterator un_cent_cloud_itr = unlabeled_voxel_centroid_cloud_->begin ();
-  std::cout << "START" << std::endl;
   for (int idx = 0 ; leaf_itr != sequential_octree_->end (); ++leaf_itr, ++cent_cloud_itr, ++idx)
   {
     SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
-//    std::cout << new_voxel_data.xyz_ << std::endl;
     // Add the point to the centroid cloud
     new_voxel_data.getPoint (*cent_cloud_itr);
     // Push correct index in
@@ -260,27 +268,53 @@ pcl::SequentialSVClustering<PointT>::computeVoxelData ()
       ++un_cent_cloud_itr;
     }
   }
-  std::cout << "END" << std::endl;
   // If input point type does not have normals, we need to compute them
   if (!pcl::traits::has_normal<PointT>::value || ignore_input_normals_)
   {
-    cent_cloud_itr = voxel_centroid_cloud_->begin ();
-    un_cent_cloud_itr = unlabeled_voxel_centroid_cloud_->begin ();
+//    cent_cloud_itr = voxel_centroid_cloud_->begin ();
+//    un_cent_cloud_itr = unlabeled_voxel_centroid_cloud_->begin ();
     parallelComputeNormals ();
-
     // Fill the unlabeled voxel cloud
-    for (leaf_itr = sequential_octree_->begin () ; leaf_itr != sequential_octree_->end () ; ++leaf_itr, ++cent_cloud_itr)
-    {
-      SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
-      //Add the point to the centroid cloud
-      if(new_voxel_data.label_ == -1)
-      {
-        //Add the point to unlabelized the centroid cloud
-        new_voxel_data.getPoint (*un_cent_cloud_itr);
-        ++un_cent_cloud_itr;
-      }
-//      std::cout << new_voxel_data.normal_ << std::endl;
-    }
+//    for (leaf_itr = sequential_octree_->begin () ; leaf_itr != sequential_octree_->end () ; ++leaf_itr, ++cent_cloud_itr)
+//    {
+//      SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
+//      //Add the point to the centroid cloud
+//      if(new_voxel_data.label_ == -1)
+//      {
+//        //Add the point to unlabelized the centroid cloud
+//        new_voxel_data.getPoint (*un_cent_cloud_itr);
+//        ++un_cent_cloud_itr;
+//      }
+//    }
+
+//    for (leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
+//    {
+//      SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
+//      //For every point, get its neighbors, build an index vector, compute normal
+//      std::vector<int> indices;
+//      indices.reserve (81);
+//      //Push this point
+//      indices.push_back (new_voxel_data.idx_);
+//      for (typename LeafContainerT::const_iterator neighb_itr=(*leaf_itr)->cbegin (); neighb_itr!=(*leaf_itr)->cend (); ++neighb_itr)
+//      {
+//        SequentialVoxelData& neighb_voxel_data = (*neighb_itr)->getData ();
+//        //Push neighbor index
+//        indices.push_back (neighb_voxel_data.idx_);
+//        //Get neighbors neighbors, push onto cloud
+//        for (typename LeafContainerT::const_iterator neighb_neighb_itr=(*neighb_itr)->cbegin (); neighb_neighb_itr!=(*neighb_itr)->cend (); ++neighb_neighb_itr)
+//        {
+//          SequentialVoxelData& neighb2_voxel_data = (*neighb_neighb_itr)->getData ();
+//          indices.push_back (neighb2_voxel_data.idx_);
+//        }
+//      }
+//      //Compute normal
+//      pcl::computePointNormal (*voxel_centroid_cloud_, indices, new_voxel_data.normal_, new_voxel_data.curvature_);
+//      pcl::flipNormalTowardsViewpoint (voxel_centroid_cloud_->points[new_voxel_data.idx_], 0.0f,0.0f,0.0f, new_voxel_data.normal_);
+//      new_voxel_data.normal_[3] = 0.0f;
+//      new_voxel_data.normal_.normalize ();
+//      new_voxel_data.owner_ = 0;
+//      new_voxel_data.distance_ = std::numeric_limits<float>::max ();
+//    }
   }
   //Update kdtree now that we have updated centroid cloud
   voxel_kdtree_.reset (new pcl::search::KdTree<PointT>);
@@ -321,11 +355,11 @@ pcl::SequentialSVClustering<PointT>::parallelComputeNormals ()
       pcl::flipNormalTowardsViewpoint (voxel_centroid_cloud_->points[new_voxel_data.idx_], 0.0f,0.0f,0.0f, new_voxel_data.normal_);
       new_voxel_data.normal_[3] = 0.0f;
       new_voxel_data.normal_.normalize ();
-      //      new_voxel_data.owner_ = 0;
-      //      new_voxel_data.distance_ = std::numeric_limits<float>::max ();
+      new_voxel_data.owner_ = 0;
+      new_voxel_data.distance_ = std::numeric_limits<float>::max ();
       {
         //        boost::interprocess::scoped_lock<boost::mutex> lock(mutex_normals_);
-        //        new_voxel_data.getPoint (voxel_centroid_cloud_->at (idx));
+//        new_voxel_data.getPoint (voxel_centroid_cloud_->at (idx));
       }
     }
   }
@@ -342,7 +376,7 @@ pcl::SequentialSVClustering<PointT>::selectInitialSupervoxelSeeds (std::vector<i
   // std::cout << "Size of centroid cloud="<<voxel_centroid_cloud_->size ()<<", seeding resolution="<<seed_resolution_<<"\n";
   //Initialize octree with voxel centroids
   pcl::octree::OctreePointCloudSearch <PointT> seed_octree (seed_resolution_);
-  seed_octree.setInputCloud (voxel_centroid_cloud_);
+  seed_octree.setInputCloud (unlabeled_voxel_centroid_cloud_);
   seed_octree.addPointsFromInputCloud ();
   // std::cout << "Size of octree ="<<seed_octree.getLeafCount ()<<"\n";
   std::vector<PointT, Eigen::aligned_allocator<PointT> > voxel_centers;
@@ -358,9 +392,8 @@ pcl::SequentialSVClustering<PointT>::selectInitialSupervoxelSeeds (std::vector<i
   distance.resize(1,0);
   if (voxel_kdtree_ == 0)
   {
-    std::cout << "Taille cloud initial: " << voxel_centroid_cloud_->size() << std::endl;
     voxel_kdtree_.reset (new pcl::search::KdTree<PointT>);
-    voxel_kdtree_ ->setInputCloud (voxel_centroid_cloud_);
+    voxel_kdtree_ ->setInputCloud (unlabeled_voxel_centroid_cloud_);
   }
 
   for (int i = 0; i < num_seeds; ++i)
@@ -461,9 +494,9 @@ pcl::SequentialSVClustering<PointT>::getAvailableLabels ()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::expandSupervoxelsFast ( int depth )
+pcl::SequentialSVClustering<PointT>::expandSupervoxels ( int depth )
 {
-  for (int i = 0; i < depth; ++i)
+  for (int i = 1; i < depth; ++i)
   {
     //Expand the the supervoxels one iteration each
     for (typename HelperListT::iterator sv_itr = supervoxel_helpers_.begin (); sv_itr != supervoxel_helpers_.end (); ++sv_itr)
@@ -485,19 +518,40 @@ pcl::SequentialSVClustering<PointT>::expandSupervoxelsFast ( int depth )
       }
     }
 
-    if ( i < depth - 1 ) //If not on last iteration clear all leaves of ownership
-    {
-      typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
-      for (leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
-      {
-        SequentialVoxelData& voxel = (*leaf_itr)->getData ();
-        voxel.owner_ = 0;
-        voxel.label_ = -1;
-        voxel.distance_ = std::numeric_limits<float>::max ();
-      }
-    }
-
+//    if ( i < depth - 1 ) //If not on last iteration clear all leaves of ownership
+//    {
+//      typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
+//      for (leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
+//      {
+//        SequentialVoxelData& voxel = (*leaf_itr)->getData ();
+//        voxel.owner_ = 0;
+//        voxel.label_ = -1;
+//        voxel.distance_ = std::numeric_limits<float>::max ();
+//      }
+//    }
   }
+//  for (int i = 1; i < depth; ++i)
+//  {
+//      //Expand the the supervoxels by one iteration
+//      for (typename HelperListT::iterator sv_itr = supervoxel_helpers_.begin (); sv_itr != supervoxel_helpers_.end (); ++sv_itr)
+//      {
+//        sv_itr->expand ();
+//      }
+
+//      //Update the centers to reflect new centers
+//      for (typename HelperListT::iterator sv_itr = supervoxel_helpers_.begin (); sv_itr != supervoxel_helpers_.end (); )
+//      {
+//        if (sv_itr->size () == 0)
+//        {
+//          sv_itr = supervoxel_helpers_.erase (sv_itr);
+//        }
+//        else
+//        {
+//          sv_itr->updateCentroid ();
+//          ++sv_itr;
+//        }
+//      }
+//  }
 }
 
 
@@ -540,10 +594,12 @@ pcl::SequentialSVClustering<PointT>::globalCheck()
     for(typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
     {
       SequentialVoxelData& voxel = (*leaf_itr)->getData ();
+      // Handling new voxels
       if( voxel.label_ == -1)
       {
         ++nb_of_unlabeled_voxels_;
       }
+      // Handling existing voxels that have changed between two frames
       else if(voxel.isChanged())
       {
         // Minus 1 because labels start at 1"
@@ -551,12 +607,13 @@ pcl::SequentialSVClustering<PointT>::globalCheck()
         voxel.label_ = -1;
         ++nb_of_unlabeled_voxels_;
       }
+      // Handling unchanged voxels
       else
       {
         ++nb_voxels_by_labels[voxel.label_ - 1];
       }
     }
-
+    // Unlabel all the voxels whom supervoxel has changed by more than a half (a little less than a half in reality)
     for(typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
     {
       SequentialVoxelData& voxel = (*leaf_itr)->getData ();
@@ -633,8 +690,8 @@ pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_
 {
   //Initialize octree with voxel centroids
   pcl::octree::OctreePointCloudAdjacency<PointT> seed_octree (seed_resolution_);
-  //  if (use_single_camera_transform_)
-  //    seed_octree.setTransformFunction (boost::bind (&SequentialSVClustering::transformFunction, this, _1));
+    if (use_single_camera_transform_)
+      seed_octree.setTransformFunction (boost::bind (&SequentialSVClustering::transformFunction, this, _1));
   seed_octree.setInputCloud (voxel_centroid_cloud_);
   seed_octree.addPointsFromInputCloud ();
 
@@ -829,7 +886,6 @@ pcl::SequentialSVClustering<PointT>::SequentialSupervoxelHelper::expand ()
   std::vector<LeafContainerT*> new_owned;
   new_owned.reserve (leaves_.size () * 9);
   //For each leaf belonging to this supervoxel
-  pcl::StopWatch timer_;
   typename SequentialSupervoxelHelper::iterator leaf_itr;
   for (leaf_itr = leaves_.begin (); leaf_itr != leaves_.end (); ++leaf_itr)
   {
@@ -1214,13 +1270,10 @@ pcl::SequentialSVClustering<PointT>::transformFunction (PointT &p)
 template <typename PointT> float
 pcl::SequentialSVClustering<PointT>::sequentialVoxelDataDistance (const SequentialVoxelData &v1, const SequentialVoxelData &v2) const
 {
-
   float spatial_dist = (v1.xyz_ - v2.xyz_).norm () / seed_resolution_;
   float color_dist =  (v1.rgb_ - v2.rgb_).norm () / 255.0f;
   float cos_angle_normal = 1.0f - std::abs (v1.normal_.dot (v2.normal_));
-  // std::cout << "s="<<spatial_dist<<"  c="<<color_dist<<"   an="<<cos_angle_normal<<"\n";
   return  cos_angle_normal * normal_importance_ + color_dist * color_importance_+ spatial_dist * spatial_importance_;
-
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

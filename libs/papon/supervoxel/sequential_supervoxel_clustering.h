@@ -149,6 +149,14 @@ namespace pcl
             // owner_ = 0;
           }
 
+          void
+          initLastPoint ()
+          {
+            previous_xyz_ = xyz_;
+            previous_rgb_ = rgb_;
+            previous_normal_ = normal_;
+          }
+
           // Use the methods from VoxelData
           using SupervoxelClustering<PointT>::VoxelData::getPoint;
           using SupervoxelClustering<PointT>::VoxelData::getNormal;
@@ -370,8 +378,9 @@ namespace pcl
       void
       clearOwnersSetCentroids ();
 
+      /** \brief This performs the superpixel evolution */
       void
-      expandSupervoxelsFast ( int depth );
+      expandSupervoxels ( int depth );
 
       /** \brief This method appends internal supervoxel helpers to the list based on the provided seed points
        *  \param[in] seed_indices Indices of the leaves to use as seeds
