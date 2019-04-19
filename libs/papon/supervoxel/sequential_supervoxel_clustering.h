@@ -141,12 +141,23 @@ namespace pcl
           {
             new_leaf_ = false;
             has_changed_ = false;
-            idx_ = -1;
+//            idx_ = -1;
             // Update the previous state of the voxel
             previous_xyz_ = xyz_;
             previous_rgb_ = rgb_;
             previous_normal_ = normal_;
+            xyz_ = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
+            rgb_ = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
+            normal_ = Eigen::Vector4f(0.0f, 0.0f, 0.0f, 0.0f);
             // owner_ = 0;
+          }
+
+          void
+          revertToLastPoint ()
+          {
+            xyz_ = previous_xyz_;
+            rgb_ = previous_rgb_;
+            normal_ = previous_normal_;
           }
 
           void

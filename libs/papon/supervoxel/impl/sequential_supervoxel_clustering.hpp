@@ -78,7 +78,7 @@ pcl::SequentialSVClustering<PointT>::setInputCloud (const typename pcl::PointClo
   }
 
   input_ = cloud;
-  sequential_octree_.reset (new OctreeSequentialT (resolution_));
+//  sequential_octree_.reset (new OctreeSequentialT (resolution_));
   if (sequential_octree_->size() == 0)
   {
     sequential_octree_.reset (new OctreeSequentialT (resolution_));
@@ -145,7 +145,7 @@ pcl::SequentialSVClustering<PointT>::extract (std::map<uint32_t,typename Sequent
 
   std::vector<int> seed_indices, existing_seed_indices;
 
-  if(true)//nb_previous_supervoxel_clusters == 0)
+  if(false)//nb_previous_supervoxel_clusters == 0)
   {
     selectInitialSupervoxelSeeds (seed_indices);
     createHelpersFromSeedIndices (seed_indices);
@@ -278,10 +278,10 @@ pcl::SequentialSVClustering<PointT>::computeVoxelData ()
 //    for (leaf_itr = sequential_octree_->begin () ; leaf_itr != sequential_octree_->end () ; ++leaf_itr, ++cent_cloud_itr)
 //    {
 //      SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
-//      //Add the point to the centroid cloud
+////      Add the point to the centroid cloud
 //      if(new_voxel_data.label_ == -1)
 //      {
-//        //Add the point to unlabelized the centroid cloud
+////        Add the point to unlabelized the centroid cloud
 //        new_voxel_data.getPoint (*un_cent_cloud_itr);
 //        ++un_cent_cloud_itr;
 //      }
@@ -688,37 +688,110 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
 template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_indices, std::vector<int> &seed_indices)
 {
-  //Initialize octree with voxel centroids
-  pcl::octree::OctreePointCloudAdjacency<PointT> seed_octree (seed_resolution_);
-    if (use_single_camera_transform_)
-      seed_octree.setTransformFunction (boost::bind (&SequentialSVClustering::transformFunction, this, _1));
-  seed_octree.setInputCloud (voxel_centroid_cloud_);
-  seed_octree.addPointsFromInputCloud ();
+//  //Initialize octree with voxel centroids
+//  pcl::octree::OctreePointCloudAdjacency<PointT> seed_octree (seed_resolution_);
+//    if (use_single_camera_transform_)
+//      seed_octree.setTransformFunction (boost::bind (&SequentialSVClustering::transformFunction, this, _1));
+//  seed_octree.setInputCloud (voxel_centroid_cloud_);
+//  seed_octree.addPointsFromInputCloud ();
 
+//  std::vector<PointT, Eigen::aligned_allocator<PointT> > voxel_centers;
+//  int num_seeds = seed_octree.getOccupiedVoxelCenters(voxel_centers);
+
+//  std::vector<int> seed_indices_orig;
+//  seed_indices_orig.resize (num_seeds, 0);
+//  seed_indices.clear ();
+//  std::vector<int> closest_index(1,0);
+//  std::vector<float> distance(1,0);
+
+//  if (voxel_kdtree_ == 0)
+//  {
+//    voxel_kdtree_.reset (new pcl::search::KdTree<PointT>);
+//    voxel_kdtree_ ->setInputCloud (voxel_centroid_cloud_);
+//  }
+
+//  for (int i = 0; i < num_seeds; ++i)
+//  {
+//    if (use_single_camera_transform_)
+//    {
+//      //Inverse transform the point.
+//      voxel_centers[i].z = std::exp (voxel_centers[i].z);
+//      voxel_centers[i].x *= voxel_centers[i].z;
+//      voxel_centers[i].y *= voxel_centers[i].z;
+//    }
+//    voxel_kdtree_->nearestKSearch (voxel_centers[i], 1, closest_index, distance);
+//    seed_indices_orig[i] = closest_index[0];
+//  }
+
+//  std::vector<int> neighbors;
+//  std::vector<float> sqr_distances;
+//  seed_indices.reserve (seed_indices_orig.size ());
+//  float search_radius = seed_resolution_;
+//  // This is 1/20th of the number of voxels which fit in a planar slice through search volume
+//  // Area of planar slice / area of voxel side. (Note: This is smaller than the value mentioned in the original paper)
+//  float min_points = 0.05f * (search_radius)*(search_radius) * 3.1415926536f  / (resolution_*resolution_);
+//  for (size_t i = 0; i < seed_indices_orig.size (); ++i)
+//  {
+//    int num = voxel_kdtree_->radiusSearch (seed_indices_orig[i], search_radius , neighbors, sqr_distances);
+//    int min_index = seed_indices_orig[i];
+//    bool not_too_close = true;
+//    // For all neighbours
+//    for(int j = 0 ; j < neighbors.size() ; ++j )
+//    {
+//      if(not_too_close)
+//      {
+//        // For all existing seed indices
+//        for(int k = 0 ; k < existing_seed_indices.size() ; ++k)
+//        {
+//          if(neighbors[j] == existing_seed_indices[k])
+//          {
+//            not_too_close = false;
+//          }
+//        }
+//      }
+//      else
+//      {
+//        break;
+//      }
+//    }
+//    if ( num > min_points && not_too_close)
+//    {
+//      seed_indices.push_back (min_index);
+//    }
+//  }
+
+
+
+
+  //TODO THIS IS BAD - SEEDING SHOULD BE BETTER
+  //TODO Switch to assigning leaves! Don't use Octree!
+
+  // std::cout << "Size of centroid cloud="<<voxel_centroid_cloud_->size ()<<", seeding resolution="<<seed_resolution_<<"\n";
+  //Initialize octree with voxel centroids
+  pcl::octree::OctreePointCloudSearch <PointT> seed_octree (seed_resolution_);
+  seed_octree.setInputCloud (unlabeled_voxel_centroid_cloud_);
+  seed_octree.addPointsFromInputCloud ();
+  // std::cout << "Size of octree ="<<seed_octree.getLeafCount ()<<"\n";
   std::vector<PointT, Eigen::aligned_allocator<PointT> > voxel_centers;
   int num_seeds = seed_octree.getOccupiedVoxelCenters(voxel_centers);
+  //std::cout << "Number of seed points before filtering="<<voxel_centers.size ()<<std::endl;
 
   std::vector<int> seed_indices_orig;
   seed_indices_orig.resize (num_seeds, 0);
   seed_indices.clear ();
-  std::vector<int> closest_index(1,0);
-  std::vector<float> distance(1,0);
-
+  std::vector<int> closest_index;
+  std::vector<float> distance;
+  closest_index.resize(1,0);
+  distance.resize(1,0);
   if (voxel_kdtree_ == 0)
   {
     voxel_kdtree_.reset (new pcl::search::KdTree<PointT>);
-    voxel_kdtree_ ->setInputCloud (voxel_centroid_cloud_);
+    voxel_kdtree_ ->setInputCloud (unlabeled_voxel_centroid_cloud_);
   }
 
   for (int i = 0; i < num_seeds; ++i)
   {
-    if (use_single_camera_transform_)
-    {
-      //Inverse transform the point.
-      voxel_centers[i].z = std::exp (voxel_centers[i].z);
-      voxel_centers[i].x *= voxel_centers[i].z;
-      voxel_centers[i].y *= voxel_centers[i].z;
-    }
+    // Search for the nearest neighbour to voxel center[i], stores its index in closest_index and distance in distance
     voxel_kdtree_->nearestKSearch (voxel_centers[i], 1, closest_index, distance);
     seed_indices_orig[i] = closest_index[0];
   }
@@ -726,7 +799,7 @@ pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_
   std::vector<int> neighbors;
   std::vector<float> sqr_distances;
   seed_indices.reserve (seed_indices_orig.size ());
-  float search_radius = seed_resolution_;
+  float search_radius = 0.5f*seed_resolution_;
   // This is 1/20th of the number of voxels which fit in a planar slice through search volume
   // Area of planar slice / area of voxel side. (Note: This is smaller than the value mentioned in the original paper)
   float min_points = 0.05f * (search_radius)*(search_radius) * 3.1415926536f  / (resolution_*resolution_);

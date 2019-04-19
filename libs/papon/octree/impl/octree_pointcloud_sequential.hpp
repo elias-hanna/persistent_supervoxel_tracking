@@ -89,13 +89,20 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   }
   //Otherwise, start sequential update
   //Go through and reset all the containers for the new frame.
-  typename LeafVectorT::iterator leaf_itr;
-  for (leaf_itr = leaf_vector_.begin () ; leaf_itr != leaf_vector_.end (); ++leaf_itr)
+//  typename LeafVectorT::iterator leaf_itr;
+//  for (leaf_itr = leaf_vector_.begin () ; leaf_itr != leaf_vector_.end (); ++leaf_itr)
+//  {
+//    (*leaf_itr)->getData ().prepareForNewFrame ();
+//    (*leaf_itr)->resetPointCount ();
+//  }
+  LeafContainerT *leaf_container;
+  typename OctreeSequentialT::LeafNodeDepthFirstIterator leaf_itr;
+  for (leaf_itr = this->leaf_depth_begin (); leaf_itr != this->leaf_depth_end (); ++leaf_itr)
   {
-    (*leaf_itr)->getData ().prepareForNewFrame ();
-    (*leaf_itr)->resetPointCount ();
+    leaf_container = &(leaf_itr.getLeafContainer ());
+    leaf_container->getData ().prepareForNewFrame ();
+    leaf_container->resetPointCount ();
   }
-
   // Clear and Alloc memory for the new vectors containing leaves and keys. 
   // Alloc at least same size as current leaf_vector
   new_leaves_.clear ();
@@ -204,7 +211,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
           if (leaf_container->getData ().frame_occluded_ == 0)
             leaf_container->getData ().frame_occluded_ = frame_counter_;
           //We don't need to do this anymore since we're using the accumulator
-          //leaf_container->getData ().revertToLastPoint ();
+          leaf_container->getData ().revertToLastPoint ();
         }
       }
       else //not occluded & not observed safe to delete
@@ -334,6 +341,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   {
     PointT temp (point_arg);
     transform_func_ (temp);
+
    // calculate integer key for transformed point coordinates
     if (pcl::isFinite (temp)) //Make sure transformed point is finite - if it is not, it gets default key
     {
@@ -403,14 +411,13 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   // generate key - use adjacency function since it possibly has a transform
 //  OctreeAdjacencyT::genOctreeKeyforPoint (point, *key);
 //  OctreePointCloudT::genOctreeKeyforPoint (point, *key);
-  genOctreeKeyforPoint (point, *key);
+  this->genOctreeKeyforPoint (point, *key);
 
   // Check if leaf exists in octree at key
   LeafContainerT* container = this->findLeaf(*key);
-  // std::cout << "In function addPointSequential owner_: " << container->getData().owner_ << std::endl; 
   if (container == 0) //If not, do a lock and add the leaf
   {
-    boost::mutex::scoped_lock (create_mutex_);
+    boost::mutex::scoped_lock create_mutex_;
     //Check again, since another thread might have created between the first find and now
     container = this->findLeaf(*key);
     if (container == 0)
@@ -427,7 +434,6 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   }
   //Add the point to the leaf
   container->addPoint (point);
-  
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -493,7 +499,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   min_z_pt.z = 0.3;
 //  OctreeAdjacencyT::genOctreeKeyforPoint (min_z_pt, kinect_min_z);
 //  OctreePointCloudT::genOctreeKeyforPoint (min_z_pt, kinect_min_z);
-  genOctreeKeyforPoint (min_z_pt, kinect_min_z);
+  this->genOctreeKeyforPoint (min_z_pt, kinect_min_z);
 
   OctreeKey current_key = *key;
   OctreeKey camera_key;
@@ -503,7 +509,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
     temp.z = 0.03f; //Can't set to zero if using a transform.
 //  OctreeAdjacencyT::genOctreeKeyforPoint (temp, camera_key);
 //  OctreePointCloudT::genOctreeKeyforPoint (temp, camera_key);
-  genOctreeKeyforPoint (temp, camera_key);
+  this->genOctreeKeyforPoint (temp, camera_key);
   Eigen::Vector3f camera_key_vals (camera_key.x, camera_key.y, camera_key.z);
   Eigen::Vector3f leaf_key_vals (current_key.x,current_key.y,current_key.z);
   
