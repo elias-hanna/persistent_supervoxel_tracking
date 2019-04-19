@@ -84,30 +84,6 @@ namespace pcl
         friend class OctreeBreadthFirstIterator<OctreeSequentialT> ;
         friend class OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> ;
 
-
-        // Octree leaf node iterators
-        //                typedef OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> LeafNodeIterator;
-        //                typedef const OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> ConstLeafNodeIterator;
-
-        //                PCL_DEPRECATED ("Please use leaf_depth_begin () instead.")
-        //                LeafNodeIterator leaf_begin (unsigned int max_depth_arg = 0) { return LeafNodeIterator (this, max_depth_arg); }
-        //                PCL_DEPRECATED ("Please use leaf_depth_end () instead.")
-        //                const LeafNodeIterator leaf_end () { return LeafNodeIterator (this, 0, NULL); }
-
-        //                // The currently valide names
-        //                typedef OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> LeafNodeDepthFirstIterator;
-        //                typedef const OctreeLeafNodeDepthFirstIterator<OctreeSequentialT> ConstLeafNodeDepthFirstIterator;
-
-        //                LeafNodeDepthFirstIterator leaf_depth_begin (unsigned int max_depth_arg = 0u)
-        //                {
-        //                  return LeafNodeDepthFirstIterator (this, max_depth_arg? max_depth_arg : this->octree_depth_);
-        //                }
-
-        //                const LeafNodeDepthFirstIterator leaf_depth_end ()
-        //                {
-        //                  return LeafNodeDepthFirstIterator (this, 0, NULL);
-        //                }
-
         // Leaf vector - pointers to all leaves
         typedef std::vector<LeafContainerT*> LeafVectorT;
         typedef std::vector<boost::shared_ptr<OctreeKey> >  KeyVectorT;

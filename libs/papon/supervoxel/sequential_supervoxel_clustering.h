@@ -141,7 +141,6 @@ namespace pcl
           {
             new_leaf_ = false;
             has_changed_ = false;
-//            idx_ = -1;
             // Update the previous state of the voxel
             previous_xyz_ = xyz_;
             previous_rgb_ = rgb_;
@@ -149,7 +148,6 @@ namespace pcl
             xyz_ = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
             rgb_ = Eigen::Vector3f(0.0f, 0.0f, 0.0f);
             normal_ = Eigen::Vector4f(0.0f, 0.0f, 0.0f, 0.0f);
-            // owner_ = 0;
           }
 
           void
@@ -368,12 +366,6 @@ namespace pcl
       void
       transformFunction (PointT &p);
 
-      /** \brief This selects points to use as initial supervoxel centroids
-       *  \param[out] seed_indices The selected leaf indices
-       */
-      void
-      selectInitialSupervoxelSeeds (std::vector<int> &seed_indices);
-
       /** \brief This roughly founds the same seeding points as those from the previous frame
        *  \param[out] existing_seed_indices The selected leaf indices
        */
@@ -381,30 +373,18 @@ namespace pcl
       getPreviousSeedingPoints (SequentialSVMapT &supervoxel_clusters, std::vector<int> &existing_seed_indices);
 
       /** \brief This method finds seeding points, then prune the seeds that are too close to existing ones
-       * and stores the resulting seeds in seed_indices
+       * and stores seeds that are going to be used to supervoxelize the scene in seed_indices
        */
       void
       pruneSeeds (std::vector<int> &existing_seed_indices, std::vector<int> &seed_indices);
-
-      void
-      clearOwnersSetCentroids ();
 
       /** \brief This performs the superpixel evolution */
       void
       expandSupervoxels ( int depth );
 
-      /** \brief This method appends internal supervoxel helpers to the list based on the provided seed points
-       *  \param[in] seed_indices Indices of the leaves to use as seeds
-       */
-      void
-      appendHelpersFromSeedIndices (std::vector<int> &seed_indices);
-
       /** \brief Constructs the map of supervoxel clusters from the internal supervoxel helpers */
       void
       makeSupervoxels (std::map<uint32_t,typename SequentialSV<PointT>::Ptr > &supervoxel_clusters);
-
-      void
-      createHelpersFromSeedIndices (std::vector<int> &seed_indices);
 
       void
       addHelpersFromUnlabeledSeedIndices(std::vector<int> &seed_indices);

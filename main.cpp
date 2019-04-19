@@ -114,8 +114,8 @@ main( int argc, char** argv )
     while(!viewer->wasStopped ())
     {
         // Get the cloud
-        cloud = getter.getCloud();
-//        copyPointCloud(*clouds[i%N_DATA], cloud);//cloud = clouds[i%N_DATA];
+//        cloud = getter.getCloud();
+        copyPointCloud(*clouds[i%N_DATA], cloud);//cloud = clouds[i%N_DATA];
 
         // If a cloud got captured from the device
         if(!cloud.empty())
@@ -133,10 +133,14 @@ main( int argc, char** argv )
 //            pcl::visualization::PointCloudColorHandlerCustom<PointT> single_color (voxel_centroid_cloud, 0, 255, 0);
 //            viewer->addPointCloud<PointT> (voxel_centroid_cloud, single_color, "voxel centroids");
 //            Show the voxel centroid cloud without color
-//            PointCloudT::Ptr voxel_centroid_cloud = super.getVoxelCentroidCloud ();
-//            viewer->addPointCloud (voxel_centroid_cloud, "voxel centroids");
-//            viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,2.0, "voxel centroids");
-//            viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,0.5, "voxel centroids");
+            PointCloudT::Ptr voxel_centroid_cloud = super.getVoxelCentroidCloud ();
+            // Without color
+            viewer->addPointCloud (voxel_centroid_cloud, "voxel centroids");
+            // With color
+//            pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgb(voxel_centroid_cloud);
+//            viewer->addPointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids");
+            viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,2.0, "voxel centroids");
+            viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,0.5, "voxel centroids");
 //            Add labels on top of the voxel centroid cloud
             PointLCloudT::Ptr labeled_voxel_cloud = super.getLabeledVoxelCloud ();
             viewer->addPointCloud (labeled_voxel_cloud, "labeled voxels");
@@ -144,7 +148,7 @@ main( int argc, char** argv )
 
             viewer->spinOnce (10);
 
-//            viewer->removePointCloud("voxel centroids");
+            viewer->removePointCloud("voxel centroids");
             viewer->removePointCloud("labeled voxels");
 
             ++i;

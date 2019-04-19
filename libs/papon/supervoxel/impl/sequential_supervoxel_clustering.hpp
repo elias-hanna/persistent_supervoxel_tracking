@@ -32,8 +32,8 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- * Author : jpapon@gmail.com
- * Email  : jpapon@gmail.com
+ * Author : h.elias@hotmail.fr
+ * Email  : h.elias@hotmail.fr
  *
  */
 
@@ -78,7 +78,6 @@ pcl::SequentialSVClustering<PointT>::setInputCloud (const typename pcl::PointClo
   }
 
   input_ = cloud;
-//  sequential_octree_.reset (new OctreeSequentialT (resolution_));
   if (sequential_octree_->size() == 0)
   {
     sequential_octree_.reset (new OctreeSequentialT (resolution_));
@@ -92,15 +91,6 @@ pcl::SequentialSVClustering<PointT>::setInputCloud (const typename pcl::PointClo
     sequential_octree_->setDifferenceThreshold (0.2);
     sequential_octree_->setNumberOfThreads (NUM_THREADS);
     sequential_octree_->setOcclusionTestInterval (0.25f);
-    int j = 0;
-    for(auto point: input_->points)
-    {
-      if(pcl::isFinite(point))
-        j++;
-    }
-    std::cout << "NUMBER OF FINITE POINTS: " << j << std::endl;
-    //67411
-
     sequential_octree_->setInputCloud (cloud);
     sequential_octree_->defineBoundingBoxOnInputCloud ();
   }
@@ -145,17 +135,10 @@ pcl::SequentialSVClustering<PointT>::extract (std::map<uint32_t,typename Sequent
 
   std::vector<int> seed_indices, existing_seed_indices;
 
-  if(false)//nb_previous_supervoxel_clusters == 0)
-  {
-    selectInitialSupervoxelSeeds (seed_indices);
-    createHelpersFromSeedIndices (seed_indices);
-  }
-  else
-  {
-    getPreviousSeedingPoints(supervoxel_clusters, existing_seed_indices);
-    pruneSeeds(existing_seed_indices, seed_indices);
-    addHelpersFromUnlabeledSeedIndices(seed_indices);
-  }
+  getPreviousSeedingPoints(supervoxel_clusters, existing_seed_indices);
+  pruneSeeds(existing_seed_indices, seed_indices);
+  addHelpersFromUnlabeledSeedIndices(seed_indices);
+
   double t_seeds = timer_.getTime ();
 
   int max_depth = static_cast<int> (sqrt(2)*seed_resolution_/resolution_);
@@ -183,8 +166,6 @@ pcl::SequentialSVClustering<PointT>::extract (std::map<uint32_t,typename Sequent
 template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::buildVoxelCloud ()
 {
-  //    std::cout << "Building voxel cloud..." << std::endl;
-  //    std::cout << "Initializing computation..." << std::endl;
   bool segmentation_is_possible = initCompute ();
   if ( !segmentation_is_possible )
   {
@@ -192,8 +173,6 @@ pcl::SequentialSVClustering<PointT>::buildVoxelCloud ()
     deinitCompute ();
     return;
   }
-  //    std::cout << "Initialization complete...\nPreparing for segmentation..." << std::endl;
-  //std::cout << "Preparing for segmentation \n";
   segmentation_is_possible = prepareForSegmentation ();
   if ( !segmentation_is_possible )
   {
@@ -222,22 +201,11 @@ pcl::SequentialSVClustering<PointT>::prepareForSegmentation ()
     return (false);
 
   //Add the new cloud of data to the octree
-  //std::cout << "Populating adjacency octree with new cloud \n";
-  //double prep_start = timer_.getTime ();
-  double update_start = timer_.getTime ();
   sequential_octree_->addPointsFromInputCloud ();
-  double update_end = timer_.getTime ();
-  std::cout << "Time elapsed adding points to octree= "<<update_end-update_start<<" ms\n";
   // GlobalCheck unlabels the voxels that changed and update nb_of_unlabeled_voxels_
   globalCheck();
-  //double prep_end = timer_.getTime ();
-  //std::cout<<"Time elapsed populating octree with next frame ="<<prep_end-prep_start<<" ms\n";
   //Compute normals and insert data for centroids into data field of octree
-  double normals_start = timer_.getTime ();
-
   computeVoxelData ();
-  double normals_end = timer_.getTime ();
-  std::cout << "Time elapsed finding normals= "<<normals_end-normals_start<<" ms\n";
 
   return true;
 }
@@ -271,50 +239,7 @@ pcl::SequentialSVClustering<PointT>::computeVoxelData ()
   // If input point type does not have normals, we need to compute them
   if (!pcl::traits::has_normal<PointT>::value || ignore_input_normals_)
   {
-//    cent_cloud_itr = voxel_centroid_cloud_->begin ();
-//    un_cent_cloud_itr = unlabeled_voxel_centroid_cloud_->begin ();
     parallelComputeNormals ();
-    // Fill the unlabeled voxel cloud
-//    for (leaf_itr = sequential_octree_->begin () ; leaf_itr != sequential_octree_->end () ; ++leaf_itr, ++cent_cloud_itr)
-//    {
-//      SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
-////      Add the point to the centroid cloud
-//      if(new_voxel_data.label_ == -1)
-//      {
-////        Add the point to unlabelized the centroid cloud
-//        new_voxel_data.getPoint (*un_cent_cloud_itr);
-//        ++un_cent_cloud_itr;
-//      }
-//    }
-
-//    for (leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
-//    {
-//      SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
-//      //For every point, get its neighbors, build an index vector, compute normal
-//      std::vector<int> indices;
-//      indices.reserve (81);
-//      //Push this point
-//      indices.push_back (new_voxel_data.idx_);
-//      for (typename LeafContainerT::const_iterator neighb_itr=(*leaf_itr)->cbegin (); neighb_itr!=(*leaf_itr)->cend (); ++neighb_itr)
-//      {
-//        SequentialVoxelData& neighb_voxel_data = (*neighb_itr)->getData ();
-//        //Push neighbor index
-//        indices.push_back (neighb_voxel_data.idx_);
-//        //Get neighbors neighbors, push onto cloud
-//        for (typename LeafContainerT::const_iterator neighb_neighb_itr=(*neighb_itr)->cbegin (); neighb_neighb_itr!=(*neighb_itr)->cend (); ++neighb_neighb_itr)
-//        {
-//          SequentialVoxelData& neighb2_voxel_data = (*neighb_neighb_itr)->getData ();
-//          indices.push_back (neighb2_voxel_data.idx_);
-//        }
-//      }
-//      //Compute normal
-//      pcl::computePointNormal (*voxel_centroid_cloud_, indices, new_voxel_data.normal_, new_voxel_data.curvature_);
-//      pcl::flipNormalTowardsViewpoint (voxel_centroid_cloud_->points[new_voxel_data.idx_], 0.0f,0.0f,0.0f, new_voxel_data.normal_);
-//      new_voxel_data.normal_[3] = 0.0f;
-//      new_voxel_data.normal_.normalize ();
-//      new_voxel_data.owner_ = 0;
-//      new_voxel_data.distance_ = std::numeric_limits<float>::max ();
-//    }
   }
   //Update kdtree now that we have updated centroid cloud
   voxel_kdtree_.reset (new pcl::search::KdTree<PointT>);
@@ -350,102 +275,17 @@ pcl::SequentialSVClustering<PointT>::parallelComputeNormals ()
         }
       }
       //Compute normal
-      //Is this temp vector really the only way to do this? Why can't I substitute vectormap for vector?
       pcl::computePointNormal (*voxel_centroid_cloud_, indices, new_voxel_data.normal_, new_voxel_data.curvature_);
       pcl::flipNormalTowardsViewpoint (voxel_centroid_cloud_->points[new_voxel_data.idx_], 0.0f,0.0f,0.0f, new_voxel_data.normal_);
       new_voxel_data.normal_[3] = 0.0f;
       new_voxel_data.normal_.normalize ();
       new_voxel_data.owner_ = 0;
       new_voxel_data.distance_ = std::numeric_limits<float>::max ();
-      {
-        //        boost::interprocess::scoped_lock<boost::mutex> lock(mutex_normals_);
-//        new_voxel_data.getPoint (voxel_centroid_cloud_->at (idx));
-      }
     }
   }
   );
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::selectInitialSupervoxelSeeds (std::vector<int> &seed_indices)
-{
-  //TODO THIS IS BAD - SEEDING SHOULD BE BETTER
-  //TODO Switch to assigning leaves! Don't use Octree!
-
-  // std::cout << "Size of centroid cloud="<<voxel_centroid_cloud_->size ()<<", seeding resolution="<<seed_resolution_<<"\n";
-  //Initialize octree with voxel centroids
-  pcl::octree::OctreePointCloudSearch <PointT> seed_octree (seed_resolution_);
-  seed_octree.setInputCloud (unlabeled_voxel_centroid_cloud_);
-  seed_octree.addPointsFromInputCloud ();
-  // std::cout << "Size of octree ="<<seed_octree.getLeafCount ()<<"\n";
-  std::vector<PointT, Eigen::aligned_allocator<PointT> > voxel_centers;
-  int num_seeds = seed_octree.getOccupiedVoxelCenters(voxel_centers);
-  //std::cout << "Number of seed points before filtering="<<voxel_centers.size ()<<std::endl;
-
-  std::vector<int> seed_indices_orig;
-  seed_indices_orig.resize (num_seeds, 0);
-  seed_indices.clear ();
-  std::vector<int> closest_index;
-  std::vector<float> distance;
-  closest_index.resize(1,0);
-  distance.resize(1,0);
-  if (voxel_kdtree_ == 0)
-  {
-    voxel_kdtree_.reset (new pcl::search::KdTree<PointT>);
-    voxel_kdtree_ ->setInputCloud (unlabeled_voxel_centroid_cloud_);
-  }
-
-  for (int i = 0; i < num_seeds; ++i)
-  {
-    // Search for the nearest neighbour to voxel center[i], stores its index in closest_index and distance in distance
-    voxel_kdtree_->nearestKSearch (voxel_centers[i], 1, closest_index, distance);
-    seed_indices_orig[i] = closest_index[0];
-  }
-
-  std::vector<int> neighbors;
-  std::vector<float> sqr_distances;
-  seed_indices.reserve (seed_indices_orig.size ());
-  float search_radius = 0.5f*seed_resolution_;
-  // This is 1/20th of the number of voxels which fit in a planar slice through search volume
-  // Area of planar slice / area of voxel side. (Note: This is smaller than the value mentioned in the original paper)
-  float min_points = 0.05f * (search_radius)*(search_radius) * 3.1415926536f  / (resolution_*resolution_);
-  for (size_t i = 0; i < seed_indices_orig.size (); ++i)
-  {
-    int num = voxel_kdtree_->radiusSearch (seed_indices_orig[i], search_radius , neighbors, sqr_distances);
-    int min_index = seed_indices_orig[i];
-    if ( num > min_points)
-    {
-      seed_indices.push_back (min_index);
-    }
-
-  }
-  // std::cout << "Number of seed points after filtering="<<seed_points.size ()<<std::endl;
-
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::createHelpersFromSeedIndices (std::vector<int> &seed_indices)
-{
-  supervoxel_helpers_.clear ();
-  for (size_t i = 0; i < seed_indices.size (); ++i)
-  {
-    // Append to the vector of supervoxel helpers a new sv helper corresponding to the considered seed point
-    supervoxel_helpers_.push_back (new SequentialSupervoxelHelper(i+1,this));
-    // Find which leaf corresponds to this seed index
-    LeafContainerT* seed_leaf = sequential_octree_->at(seed_indices[i]);
-    if (seed_leaf)
-    {
-      // Add the seed leaf to the most recent sv helper added (the one that has just been pushed back)
-      supervoxel_helpers_.back ().addLeaf (seed_leaf);
-    }
-    else
-    {
-      PCL_WARN ("Could not find leaf in pcl::SequentialSVClustering<PointT>::createHelpersFromSeedIndices - supervoxel will be deleted \n");
-    }
-  }
-}
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::addHelpersFromUnlabeledSeedIndices (std::vector<int> &seed_indices)
@@ -473,7 +313,7 @@ pcl::SequentialSVClustering<PointT>::addHelpersFromUnlabeledSeedIndices (std::ve
     }
     else
     {
-      PCL_WARN ("Could not find leaf in pcl::SequentialSVClustering<PointT>::createHelpersFromSeedIndices - supervoxel will be deleted \n");
+      PCL_WARN ("Could not find leaf in pcl::SequentialSVClustering<PointT>::addHelpersFromUnlabeledSeedIndices - supervoxel will be deleted \n");
     }
   }
 }
@@ -517,41 +357,7 @@ pcl::SequentialSVClustering<PointT>::expandSupervoxels ( int depth )
         ++sv_itr;
       }
     }
-
-//    if ( i < depth - 1 ) //If not on last iteration clear all leaves of ownership
-//    {
-//      typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
-//      for (leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
-//      {
-//        SequentialVoxelData& voxel = (*leaf_itr)->getData ();
-//        voxel.owner_ = 0;
-//        voxel.label_ = -1;
-//        voxel.distance_ = std::numeric_limits<float>::max ();
-//      }
-//    }
   }
-//  for (int i = 1; i < depth; ++i)
-//  {
-//      //Expand the the supervoxels by one iteration
-//      for (typename HelperListT::iterator sv_itr = supervoxel_helpers_.begin (); sv_itr != supervoxel_helpers_.end (); ++sv_itr)
-//      {
-//        sv_itr->expand ();
-//      }
-
-//      //Update the centers to reflect new centers
-//      for (typename HelperListT::iterator sv_itr = supervoxel_helpers_.begin (); sv_itr != supervoxel_helpers_.end (); )
-//      {
-//        if (sv_itr->size () == 0)
-//        {
-//          sv_itr = supervoxel_helpers_.erase (sv_itr);
-//        }
-//        else
-//        {
-//          sv_itr->updateCentroid ();
-//          ++sv_itr;
-//        }
-//      }
-//  }
 }
 
 
@@ -559,17 +365,6 @@ pcl::SequentialSVClustering<PointT>::expandSupervoxels ( int depth )
 template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::makeSupervoxels (SequentialSVMapT &supervoxel_clusters)
 {
-  //  supervoxel_clusters.clear ();
-  //  for (typename HelperListT::iterator sv_itr = supervoxel_helpers_.begin (); sv_itr != supervoxel_helpers_.end (); ++sv_itr)
-  //  {
-  //    uint32_t label = sv_itr->getLabel ();
-  //    std::pair<typename std::map<uint32_t,typename SequentialSV<PointT>::Ptr>::iterator,bool> ret;
-  //    ret = supervoxel_clusters.insert (std::pair<uint32_t,typename SequentialSV<PointT>::Ptr> (label, boost::make_shared<SequentialSV<PointT>> (label)));
-  //    typename std::map<uint32_t,typename SequentialSV<PointT>::Ptr>::iterator new_supervoxel_itr = ret.first;
-  //    new_supervoxel_itr->second->centroid_ = sv_itr->getCentroid ();
-  //    sv_itr->getVoxels (new_supervoxel_itr->second->voxels_);
-  //  }
-
   supervoxel_clusters.clear ();
   for (typename HelperListT::iterator sv_itr = supervoxel_helpers_.begin (); sv_itr != supervoxel_helpers_.end (); ++sv_itr)
   {
@@ -688,81 +483,6 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
 template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_indices, std::vector<int> &seed_indices)
 {
-//  //Initialize octree with voxel centroids
-//  pcl::octree::OctreePointCloudAdjacency<PointT> seed_octree (seed_resolution_);
-//    if (use_single_camera_transform_)
-//      seed_octree.setTransformFunction (boost::bind (&SequentialSVClustering::transformFunction, this, _1));
-//  seed_octree.setInputCloud (voxel_centroid_cloud_);
-//  seed_octree.addPointsFromInputCloud ();
-
-//  std::vector<PointT, Eigen::aligned_allocator<PointT> > voxel_centers;
-//  int num_seeds = seed_octree.getOccupiedVoxelCenters(voxel_centers);
-
-//  std::vector<int> seed_indices_orig;
-//  seed_indices_orig.resize (num_seeds, 0);
-//  seed_indices.clear ();
-//  std::vector<int> closest_index(1,0);
-//  std::vector<float> distance(1,0);
-
-//  if (voxel_kdtree_ == 0)
-//  {
-//    voxel_kdtree_.reset (new pcl::search::KdTree<PointT>);
-//    voxel_kdtree_ ->setInputCloud (voxel_centroid_cloud_);
-//  }
-
-//  for (int i = 0; i < num_seeds; ++i)
-//  {
-//    if (use_single_camera_transform_)
-//    {
-//      //Inverse transform the point.
-//      voxel_centers[i].z = std::exp (voxel_centers[i].z);
-//      voxel_centers[i].x *= voxel_centers[i].z;
-//      voxel_centers[i].y *= voxel_centers[i].z;
-//    }
-//    voxel_kdtree_->nearestKSearch (voxel_centers[i], 1, closest_index, distance);
-//    seed_indices_orig[i] = closest_index[0];
-//  }
-
-//  std::vector<int> neighbors;
-//  std::vector<float> sqr_distances;
-//  seed_indices.reserve (seed_indices_orig.size ());
-//  float search_radius = seed_resolution_;
-//  // This is 1/20th of the number of voxels which fit in a planar slice through search volume
-//  // Area of planar slice / area of voxel side. (Note: This is smaller than the value mentioned in the original paper)
-//  float min_points = 0.05f * (search_radius)*(search_radius) * 3.1415926536f  / (resolution_*resolution_);
-//  for (size_t i = 0; i < seed_indices_orig.size (); ++i)
-//  {
-//    int num = voxel_kdtree_->radiusSearch (seed_indices_orig[i], search_radius , neighbors, sqr_distances);
-//    int min_index = seed_indices_orig[i];
-//    bool not_too_close = true;
-//    // For all neighbours
-//    for(int j = 0 ; j < neighbors.size() ; ++j )
-//    {
-//      if(not_too_close)
-//      {
-//        // For all existing seed indices
-//        for(int k = 0 ; k < existing_seed_indices.size() ; ++k)
-//        {
-//          if(neighbors[j] == existing_seed_indices[k])
-//          {
-//            not_too_close = false;
-//          }
-//        }
-//      }
-//      else
-//      {
-//        break;
-//      }
-//    }
-//    if ( num > min_points && not_too_close)
-//    {
-//      seed_indices.push_back (min_index);
-//    }
-//  }
-
-
-
-
   //TODO THIS IS BAD - SEEDING SHOULD BE BETTER
   //TODO Switch to assigning leaves! Don't use Octree!
 
@@ -832,89 +552,6 @@ pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_
       seed_indices.push_back (min_index);
     }
   }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::clearOwnersSetCentroids ()
-{
-  int num_erased = 0;
-  //Update centroids and delete empties
-  for (typename HelperListT::iterator sv_itr = supervoxel_helpers_.begin (); sv_itr != supervoxel_helpers_.end (); )
-  {
-    if (sv_itr->size () == 0)
-    {
-      sv_itr = supervoxel_helpers_.erase (sv_itr);
-      ++num_erased;
-    }
-    else
-    {
-      sv_itr->updateCentroid ();
-      ++sv_itr;
-    }
-  }
-  std::cout <<"Erased "<<num_erased<<" Supervoxels!\n";
-  //Clear all leaves of ownership
-  typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
-  for (leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
-  {
-    SequentialVoxelData& voxel = (*leaf_itr)->getData ();
-    voxel.owner_ = 0;
-    voxel.distance_ = std::numeric_limits<float>::max ();
-  }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::appendHelpersFromSeedIndices (std::vector<int> &seed_indices)
-{
-  //TODO REMOVE
-  int num_helpers_before = supervoxel_helpers_.size ();
-  int max_label_before = SequentialSVClustering<PointT>::getMaxLabel ();
-  //////////////////////////////////
-  int num_not_added = 0;
-  uint32_t next_label = 1;
-  typename HelperListT::iterator help_itr = supervoxel_helpers_.begin ();
-  if (help_itr != supervoxel_helpers_.end ())
-    ++help_itr;
-  typename HelperListT::iterator help_itr2 = supervoxel_helpers_.begin ();
-  for (size_t i = 0; i < seed_indices.size (); ++i)
-  {
-    //First check if the leaf is already owned - if so, don't add a new seed here.
-    LeafContainerT* seed_leaf = sequential_octree_->at(seed_indices[i]);//adjacency_octree_->getLeafContainerAtPoint
-    if (seed_leaf)
-    {
-      SequentialVoxelData& voxel = seed_leaf->getData ();
-      if (voxel.owner_ != 0)
-      {
-        ++num_not_added;
-        continue;
-      }
-    }else
-    {
-      PCL_WARN ("Could not find leaf in pcl::SequentialSVClustering<PointT>::appendHelpersFromSeedIndices - supervoxel will be deleted \n");
-      continue;
-    }
-    //If we want to add this, need to find a free label
-    //The first iterator always stays one ahead - when we find a gap in labels we break
-    while (help_itr != supervoxel_helpers_.end () && help_itr->getLabel () == help_itr2->getLabel () + 1)
-    {
-      ++help_itr; ++help_itr2;
-    }
-    next_label = help_itr2->getLabel () + 1;
-    supervoxel_helpers_.insert (help_itr, new SequentialSupervoxelHelper(next_label,this));
-    // this makes itr2 point to the new element
-    ++help_itr2;
-    help_itr2->addLeaf (seed_leaf);
-  }
-  std::cout <<"Did not add "<<num_not_added<<" due to already owned!\n";
-  //TODO Can remove this - just for debugging
-  int num_helpers_after = supervoxel_helpers_.size ();
-  int max_label_after = SequentialSVClustering<PointT>::getMaxLabel ();
-  std::cout <<"Num SV Before ="<<num_helpers_before<<"  maxlabel="<<max_label_before<<"     Num SV After ="<<num_helpers_after<<"  maxlabel="<<max_label_after<<"   num new seeds="<<seed_indices.size ()<<"\n";
-  int empty_slots = max_label_before - num_helpers_before;
-  //Either the max label hasn't changed (we only filled in holes), or the max label has increased and there are no holes
-  assert ( (max_label_before == max_label_after) || (max_label_after  == (max_label_before + seed_indices.size () - empty_slots - num_not_added)));
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1363,9 +1000,9 @@ namespace pcl
     void
     pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBA,pcl::SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData>::addPoint (const pcl::PointXYZRGBA &new_point);
 
-//    template<>
-//    void
-//    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBNormal,pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData>::addPoint (const pcl::PointXYZRGBNormal &new_point);
+    //    template<>
+    //    void
+    //    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBNormal,pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData>::addPoint (const pcl::PointXYZRGBNormal &new_point);
 
     //Explicit overloads for RGB types
     template<> void
@@ -1374,8 +1011,8 @@ namespace pcl
     template<> void
     pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBA,pcl::SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData>::computeData ();
 
-//    template<> void
-//    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBNormal,pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData>::computeData ();
+    //    template<> void
+    //    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBNormal,pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData>::computeData ();
   }
 }
 

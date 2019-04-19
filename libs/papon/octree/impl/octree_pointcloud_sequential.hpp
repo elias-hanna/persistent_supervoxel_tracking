@@ -73,8 +73,6 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
     {
       boost::shared_ptr<OctreeKey> leaf_key (new OctreeKey);
       *leaf_key = leaf_itr.getCurrentOctreeKey ();
-      //std::cout << "Key\nx: " << (*leaf_key).x << " y: " << (*leaf_key).y << " z: " << (*leaf_key).z << std::endl;
-      //OctreeKey leaf_key = leaf_itr.getCurrentOctreeKey ();
       leaf_container = &(leaf_itr.getLeafContainer ());
       
       //Run the leaf's compute function
@@ -89,12 +87,6 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   }
   //Otherwise, start sequential update
   //Go through and reset all the containers for the new frame.
-//  typename LeafVectorT::iterator leaf_itr;
-//  for (leaf_itr = leaf_vector_.begin () ; leaf_itr != leaf_vector_.end (); ++leaf_itr)
-//  {
-//    (*leaf_itr)->getData ().prepareForNewFrame ();
-//    (*leaf_itr)->resetPointCount ();
-//  }
   LeafContainerT *leaf_container;
   typename OctreeSequentialT::LeafNodeDepthFirstIterator leaf_itr;
   for (leaf_itr = this->leaf_depth_begin (); leaf_itr != this->leaf_depth_end (); ++leaf_itr)
@@ -109,20 +101,6 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   new_leaves_.reserve (this->getLeafCount ());
   new_keys_.clear ();
   new_keys_.reserve (this->getLeafCount ());
-
-  //Adapt the octree to fit all input points
-  /*
-  int depth_before_addition = this->octree_depth_;
-  for (size_t i = 0; i < input_->points.size (); i++)
-  {
-    adoptBoundingBoxToPoint (input_->points[i]);
-  }
-  //If depth has changed all stored keys are not valid
-  if (this->octree_depth_ != depth_before_addition)
-  {
-    stored_keys_valid_ = false;
-  }
-  */
 
   //Now go through and add all points to the octree
   // #ifdef _OPENMP
@@ -151,15 +129,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
 
 
   // parallelUpdate (&leaf_vector_, &key_vector_, &delete_leaves, &delete_keys, &new_leaves_, &new_keys_);
-  // std::cout << "I finished to update in parallel" << std::endl;
 
-  // for (size_t i = 0 ; i < leaf_vector_.size () ; ++i)
-  // {
-  //   LeafContainerT* leaf_container = leaf_vector_[i];
-  //   // std::cout << leaf_container->getData ().idx_ << std::endl;
-  // }
-
-  // std::cout << "Passed" << std::endl;
   //Now we need to iterate through all leaves from previous frame - 
   // #ifdef _OPENMP
   // #pragma omp parallel for schedule(dynamic, 1024) shared (delete_leaves, delete_keys) //num_threads(threads_)
@@ -409,8 +379,6 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   boost::shared_ptr<OctreeKey> key (new OctreeKey);
   
   // generate key - use adjacency function since it possibly has a transform
-//  OctreeAdjacencyT::genOctreeKeyforPoint (point, *key);
-//  OctreePointCloudT::genOctreeKeyforPoint (point, *key);
   this->genOctreeKeyforPoint (point, *key);
 
   // Check if leaf exists in octree at key
@@ -497,8 +465,6 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   PointT min_z_pt;
   min_z_pt.getVector3fMap ().setZero ();
   min_z_pt.z = 0.3;
-//  OctreeAdjacencyT::genOctreeKeyforPoint (min_z_pt, kinect_min_z);
-//  OctreePointCloudT::genOctreeKeyforPoint (min_z_pt, kinect_min_z);
   this->genOctreeKeyforPoint (min_z_pt, kinect_min_z);
 
   OctreeKey current_key = *key;
@@ -507,8 +473,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   temp.getVector3fMap ().setZero ();
   if (transform_func_)
     temp.z = 0.03f; //Can't set to zero if using a transform.
-//  OctreeAdjacencyT::genOctreeKeyforPoint (temp, camera_key);
-//  OctreePointCloudT::genOctreeKeyforPoint (temp, camera_key);
+
   this->genOctreeKeyforPoint (temp, camera_key);
   Eigen::Vector3f camera_key_vals (camera_key.x, camera_key.y, camera_key.z);
   Eigen::Vector3f leaf_key_vals (current_key.x,current_key.y,current_key.z);
@@ -518,7 +483,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   direction.normalize ();
   
   const int nsteps = std::max (1, static_cast<int> (norm / occlusion_test_interval_));
-  leaf_key_vals += (direction); //* occlusion_test_interval_);
+  leaf_key_vals += (direction);
   OctreeKey test_key;
   LeafContainerT* occluder = 0;
   // Walk along the line segment with small steps.
