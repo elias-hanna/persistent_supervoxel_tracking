@@ -72,3 +72,6 @@ Thumbs.db
 
 # Build folder
 build/
+
+# Data folder
+data/
