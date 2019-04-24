@@ -236,8 +236,41 @@ pcl::SequentialSVClustering<PointT>::computeVoxelData ()
       ++un_cent_cloud_itr;
     }
   }
-  // If input point type does not have normals, we need to compute them
-  if (!pcl::traits::has_normal<PointT>::value || ignore_input_normals_)
+  //If normals were provided
+  if (input_normals_)
+  {
+    //Verify that input normal cloud size is same as input cloud size
+    assert (input_normals_->size () == input_->size ());
+    //For every point in the input cloud, find its corresponding leaf
+    typename NormalCloudT::const_iterator normal_itr = input_normals_->begin ();
+    for (typename PointCloudT::const_iterator input_itr = input_->begin (); input_itr != input_->end (); ++input_itr, ++normal_itr)
+    {
+      //If the point is not finite we ignore it
+      if ( !pcl::isFinite<PointT> (*input_itr))
+        continue;
+      //Otherwise look up its leaf container
+      LeafContainerT* leaf = sequential_octree_->getLeafContainerAtPoint (*input_itr);
+
+      //Get the voxel data object
+      SequentialVoxelData& voxel_data = leaf->getData ();
+      //Add this normal in (we will normalize at the end)
+      voxel_data.normal_ += normal_itr->getNormalVector4fMap ();
+      voxel_data.curvature_ += normal_itr->curvature;
+    }
+    //Now iterate through the leaves and normalize
+    for (leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
+    {
+      SequentialVoxelData& voxel_data = (*leaf_itr)->getData ();
+      voxel_data.normal_.normalize ();
+      voxel_data.owner_ = 0;
+      voxel_data.distance_ = std::numeric_limits<float>::max ();
+      //Get the number of points in this leaf
+      int num_points = (*leaf_itr)->getPointCounter ();
+      voxel_data.curvature_ /= num_points;
+    }
+  }
+  // Otherwise compute the normals
+  else
   {
     parallelComputeNormals ();
   }
@@ -375,6 +408,28 @@ pcl::SequentialSVClustering<PointT>::makeSupervoxels (SequentialSVMapT &supervox
     sv_itr->getNormal (supervoxel_clusters[label]->normal_);
     sv_itr->getVoxels (supervoxel_clusters[label]->voxels_);
     sv_itr->getNormals (supervoxel_clusters[label]->normals_);
+    // Fill the points with the label of the sv if the type contains label information
+//    if(pcl::traits::has_label<PointT>::value)
+//    {
+//      typename pcl::PointCloud<PointT>::iterator voxel_itr = supervoxel_clusters[label]->voxels_->begin ();
+//      for ( ; voxel_itr != supervoxel_clusters[label]->voxels_->end (); ++voxel_itr)
+//      {
+//        std::cout << "label: " << (*voxel_itr).label << std::endl;
+//      }
+////      pcl::PointCloud<pcl::PointXYZL>::Ptr labeled_voxel_cloud (new pcl::PointCloud<pcl::PointXYZL>);
+
+////      typename pcl::PointCloud<PointT>::Ptr voxels;
+////      sv_itr->getVoxels (voxels);
+////      pcl::PointCloud<pcl::PointXYZL> xyzl_copy;
+////      copyPointCloud (*voxels, xyzl_copy);
+
+////      pcl::PointCloud<pcl::PointXYZL>::iterator xyzl_copy_itr = xyzl_copy.begin ();
+////      for ( ; xyzl_copy_itr != xyzl_copy.end (); ++xyzl_copy_itr)
+////        xyzl_copy_itr->label = sv_itr->getLabel ();
+
+////      *labeled_voxel_cloud += xyzl_copy;
+////      // ADD LABEL COHERENCE
+//    }
   }
 }
 
@@ -551,6 +606,38 @@ pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_
     {
       seed_indices.push_back (min_index);
     }
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+namespace pcl
+{
+
+  template<> void
+  pcl::SequentialSVClustering<pcl::PointXYZRGB>::SequentialVoxelData::getPoint (pcl::PointXYZRGB &point_arg) const;
+
+  template<> void
+  pcl::SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData::getPoint (pcl::PointXYZRGBA &point_arg ) const;
+
+  template<typename PointT> void
+  pcl::SequentialSVClustering<PointT>::SequentialVoxelData::getPoint (PointT &point_arg ) const
+  {
+    //XYZ is required or this doesn't make much sense...
+    point_arg.x = xyz_[0];
+    point_arg.y = xyz_[1];
+    point_arg.z = xyz_[2];
+  }
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+  template <typename PointT> void
+  pcl::SequentialSVClustering<PointT>::SequentialVoxelData::getNormal (Normal &normal_arg) const
+  {
+    normal_arg.normal_x = normal_[0];
+    normal_arg.normal_y = normal_[1];
+    normal_arg.normal_z = normal_[2];
+    normal_arg.curvature = curvature_;
   }
 }
 
@@ -851,14 +938,16 @@ pcl::SequentialSVClustering<PointT>::getLabeledCloud () const
     {
       i_labeled->label = 0;
       LeafContainerT *leaf = sequential_octree_->getLeafContainerAtPoint (*i_input);
-      SequentialVoxelData& voxel_data = leaf->getData ();
-      if (voxel_data.owner_)
-        i_labeled->label = voxel_data.owner_->getLabel ();
-
+      /** \bug Sometimes points don't have a leaf container (maximum 5 points on more than 200 000) so we need the if statement
+       */
+      if(leaf)
+      {
+        SequentialVoxelData& voxel_data = leaf->getData ();
+        if (voxel_data.owner_)
+          i_labeled->label = voxel_data.owner_->getLabel ();
+      }
     }
-
   }
-
   return (labeled_cloud);
 }
 

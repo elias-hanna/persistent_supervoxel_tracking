@@ -33,19 +33,17 @@
   *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
   *  POSSIBILITY OF SUCH DAMAGE.
   *
-  * Author : jpapon@gmail.com
-  * Email  : jpapon@gmail.com
+  * Author : Elias Hanna
+  * Email  : h.elias@hotmail.fr
   *
   */
 
 #ifndef PCL_SEGMENTATION_SEQUENTIAL_SUPERVOXEL_CLUSTERING_H_
 #define PCL_SEGMENTATION_SEQUENTIAL_SUPERVOXEL_CLUSTERING_H_
 
-//#include "supervoxel_clustering.h"
 #include <pcl/segmentation/supervoxel_clustering.h>
 #include "../octree/octree_pointcloud_sequential.h"
 #include <tbb/tbb.h>
-//#include <boost/make_shared.hpp>
 
 namespace pcl
 {
@@ -72,24 +70,8 @@ namespace pcl
       /** \brief A Pointcloud of the normals for the points in the supervoxel */
       //            typename pcl::PointCloud<Normal>::Ptr normals_;
       using Supervoxel<PointT>::normals_;
-
-      //            typedef pcl::PointXYZRGBNormal CentroidT;
-      //            typedef pcl::PointXYZRGBNormal VoxelT;
-
-
-      //            /** \brief The centroid of the supervoxel */
-      //            using Supervoxel::centroid_;
-      //            /** \brief The label ID of this supervoxel */
-      //            using Supervoxel::label_;
-      //            /** \brief A Pointcloud of the voxels in the supervoxel */
-      //            using Supervoxel::voxels_;
-
-      //            SequentialSV (uint32_t label = 0) :
-      //                Supervoxel (label)
-      //            {  }
-
-      //            //! \brief Maps voxel index to measured weight - used by tracking
-      //            std::map <size_t, float> voxel_weight_map_;
+      /** \brief A Pointcloud of the voxels with xyzrgb+label data in it */
+      pcl::PointCloud<pcl::PointXYZRGBL> labeled_voxels_;
 
     public:
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -167,8 +149,21 @@ namespace pcl
           }
 
           // Use the methods from VoxelData
-          using SupervoxelClustering<PointT>::VoxelData::getPoint;
-          using SupervoxelClustering<PointT>::VoxelData::getNormal;
+          /* REMOVED TO SUPPORT MORE POINT TYPES */
+//          using SupervoxelClustering<PointT>::VoxelData::getPoint;
+//          using SupervoxelClustering<PointT>::VoxelData::getNormal;
+
+          /** \brief Gets the data of in the form of a point
+           *  \param[out] point_arg Will contain the point value of the voxeldata
+           */
+          void
+          getPoint (PointT &point_arg) const;
+
+          /** \brief Gets the data of in the form of a normal
+           *  \param[out] normal_arg Will contain the normal value of the voxeldata
+           */
+          void
+          getNormal (Normal &normal_arg) const;
 
           // Use the attributes from VoxelData
           using SupervoxelClustering<PointT>::VoxelData::idx_;
