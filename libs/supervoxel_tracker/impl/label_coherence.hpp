@@ -8,7 +8,6 @@
 template <typename PointT> double 
 pcl::tracking::LabelCoherence<PointT>::computeCoherence (PointT &source, PointT &target)
 {
-  std::cout << "source: " << source.label << " target: " << target.label << std::endl;
   if(source.label == target.label)
   {
     return 1.0;

@@ -408,28 +408,6 @@ pcl::SequentialSVClustering<PointT>::makeSupervoxels (SequentialSVMapT &supervox
     sv_itr->getNormal (supervoxel_clusters[label]->normal_);
     sv_itr->getVoxels (supervoxel_clusters[label]->voxels_);
     sv_itr->getNormals (supervoxel_clusters[label]->normals_);
-    // Fill the points with the label of the sv if the type contains label information
-//    if(pcl::traits::has_label<PointT>::value)
-//    {
-//      typename pcl::PointCloud<PointT>::iterator voxel_itr = supervoxel_clusters[label]->voxels_->begin ();
-//      for ( ; voxel_itr != supervoxel_clusters[label]->voxels_->end (); ++voxel_itr)
-//      {
-//        std::cout << "label: " << (*voxel_itr).label << std::endl;
-//      }
-////      pcl::PointCloud<pcl::PointXYZL>::Ptr labeled_voxel_cloud (new pcl::PointCloud<pcl::PointXYZL>);
-
-////      typename pcl::PointCloud<PointT>::Ptr voxels;
-////      sv_itr->getVoxels (voxels);
-////      pcl::PointCloud<pcl::PointXYZL> xyzl_copy;
-////      copyPointCloud (*voxels, xyzl_copy);
-
-////      pcl::PointCloud<pcl::PointXYZL>::iterator xyzl_copy_itr = xyzl_copy.begin ();
-////      for ( ; xyzl_copy_itr != xyzl_copy.end (); ++xyzl_copy_itr)
-////        xyzl_copy_itr->label = sv_itr->getLabel ();
-
-////      *labeled_voxel_cloud += xyzl_copy;
-////      // ADD LABEL COHERENCE
-//    }
   }
 }
 
@@ -914,6 +892,28 @@ pcl::SequentialSVClustering<PointT>::getLabeledVoxelCloud () const
       xyzl_copy_itr->label = sv_itr->getLabel ();
 
     *labeled_voxel_cloud += xyzl_copy;
+  }
+
+  return labeled_voxel_cloud;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> pcl::PointCloud<pcl::PointXYZRGBL>::Ptr
+pcl::SequentialSVClustering<PointT>::getLabeledRGBVoxelCloud () const
+{
+  pcl::PointCloud<pcl::PointXYZRGBL>::Ptr labeled_voxel_cloud (new pcl::PointCloud<pcl::PointXYZRGBL>);
+  for (typename HelperListT::const_iterator sv_itr = supervoxel_helpers_.cbegin (); sv_itr != supervoxel_helpers_.cend (); ++sv_itr)
+  {
+    typename pcl::PointCloud<PointT>::Ptr voxels;
+    sv_itr->getVoxels (voxels);
+    pcl::PointCloud<pcl::PointXYZRGBL> xyzrgbl_copy;
+    copyPointCloud (*voxels, xyzrgbl_copy);
+
+    pcl::PointCloud<pcl::PointXYZRGBL>::iterator xyzrgbl_copy_itr = xyzrgbl_copy.begin ();
+    for ( ; xyzrgbl_copy_itr != xyzrgbl_copy.end (); ++xyzrgbl_copy_itr)
+      xyzrgbl_copy_itr->label = sv_itr->getLabel ();
+
+    *labeled_voxel_cloud += xyzrgbl_copy;
   }
 
   return labeled_voxel_cloud;

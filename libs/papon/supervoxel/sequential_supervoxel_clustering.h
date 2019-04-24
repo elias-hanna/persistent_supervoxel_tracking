@@ -299,6 +299,9 @@ namespace pcl
       pcl::PointCloud<pcl::PointXYZL>::Ptr
       getLabeledVoxelCloud () const;
 
+      pcl::PointCloud<pcl::PointXYZRGBL>::Ptr
+      getLabeledRGBVoxelCloud () const;
+
       pcl::PointCloud<pcl::PointXYZRGBA>::Ptr
       getColoredVoxelCloud () const;
 

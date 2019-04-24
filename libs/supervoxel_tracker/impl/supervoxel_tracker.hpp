@@ -131,7 +131,7 @@ pcl::SupervoxelTracker<PointT, StateT>::track(PointCloudConstPtrT cloud)
   gridSampleApprox (cloud_pass, *cloud_pass_downsampled, downsampling_grid_size);
 
   StateMap states;
-  parallelTrack(&states, cloud_pass_downsampled);
+  parallelTrack(&states, cloud_pass);
 //    typename TrackerMapT::iterator itr;
 //    for (itr = trackers_.begin(); itr != trackers_.end(); ++itr)
 //    {
