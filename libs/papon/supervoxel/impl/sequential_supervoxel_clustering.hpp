@@ -320,38 +320,6 @@ pcl::SequentialSVClustering<PointT>::parallelComputeNormals ()
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::addHelpersFromUnlabeledSeedIndices (std::vector<int> &seed_indices)
-{
-  std::vector<int> available_labels = getAvailableLabels ();
-  int max_label = getMaxLabel();
-  for (int i = 0; i < seed_indices.size (); ++i)
-  {
-    if(!available_labels.empty())
-    {
-      // Append to the vector of supervoxel helpers a new sv helper corresponding to the considered seed point
-      supervoxel_helpers_.push_back (new SequentialSupervoxelHelper(available_labels.back(),this));
-      available_labels.pop_back();
-    }
-    else
-    {
-      supervoxel_helpers_.push_back (new SequentialSupervoxelHelper(++max_label,this));
-    }
-    // Find which leaf corresponds to this seed index
-    LeafContainerT* seed_leaf = sequential_octree_->at(seed_indices[i]);
-    if (seed_leaf)
-    {
-      // Add the seed leaf to the most recent sv helper added (the one that has just been pushed back)
-      supervoxel_helpers_.back ().addLeaf (seed_leaf);
-    }
-    else
-    {
-      PCL_WARN ("Could not find leaf in pcl::SequentialSVClustering<PointT>::addHelpersFromUnlabeledSeedIndices - supervoxel will be deleted \n");
-    }
-  }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> std::vector<int>
 pcl::SequentialSVClustering<PointT>::getAvailableLabels ()
 {
@@ -402,7 +370,7 @@ pcl::SequentialSVClustering<PointT>::makeSupervoxels (SequentialSVMapT &supervox
   for (typename HelperListT::iterator sv_itr = supervoxel_helpers_.begin (); sv_itr != supervoxel_helpers_.end (); ++sv_itr)
   {
     uint32_t label = sv_itr->getLabel ();
-    supervoxel_clusters[label].reset (new SequentialSV<PointT>);
+    supervoxel_clusters[label].reset (new SequentialSV<PointT>(sv_itr->isNew()));
     sv_itr->getXYZ (supervoxel_clusters[label]->centroid_.x,supervoxel_clusters[label]->centroid_.y,supervoxel_clusters[label]->centroid_.z);
     sv_itr->getRGB (supervoxel_clusters[label]->centroid_.rgba);
     sv_itr->getNormal (supervoxel_clusters[label]->normal_);
@@ -498,6 +466,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       {
         existing_seed_indices.push_back (closest_index[0]);
         (supervoxel_helpers_.back()).addLeaf(seed_leaf);
+        (supervoxel_helpers_.back()).setNew(false);
       }
       else
       {
@@ -583,6 +552,38 @@ pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_
     if ( num > min_points && not_too_close)
     {
       seed_indices.push_back (min_index);
+    }
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> void
+pcl::SequentialSVClustering<PointT>::addHelpersFromUnlabeledSeedIndices (std::vector<int> &seed_indices)
+{
+  std::vector<int> available_labels = getAvailableLabels ();
+  int max_label = getMaxLabel();
+  for (int i = 0; i < seed_indices.size (); ++i)
+  {
+    if(!available_labels.empty())
+    {
+      // Append to the vector of supervoxel helpers a new sv helper corresponding to the considered seed point
+      supervoxel_helpers_.push_back (new SequentialSupervoxelHelper(available_labels.back(),this));
+      available_labels.pop_back();
+    }
+    else
+    {
+      supervoxel_helpers_.push_back (new SequentialSupervoxelHelper(++max_label,this));
+    }
+    // Find which leaf corresponds to this seed index
+    LeafContainerT* seed_leaf = sequential_octree_->at(seed_indices[i]);
+    if (seed_leaf)
+    {
+      // Add the seed leaf to the most recent sv helper added (the one that has just been pushed back)
+      supervoxel_helpers_.back ().addLeaf (seed_leaf);
+    }
+    else
+    {
+      PCL_WARN ("Could not find leaf in pcl::SequentialSVClustering<PointT>::addHelpersFromUnlabeledSeedIndices - supervoxel will be deleted \n");
     }
   }
 }

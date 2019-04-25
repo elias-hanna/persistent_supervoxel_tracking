@@ -120,8 +120,8 @@ main( int argc, char** argv )
   while(!viewer->wasStopped ())
   {
     // Get the cloud
-    copyPointCloud(getter.getCloud(), cloud);
-    //    copyPointCloud(*clouds[i%N_DATA], cloud);//cloud = clouds[i%N_DATA];
+//    copyPointCloud(getter.getCloud(), cloud);
+    copyPointCloud(*clouds[i%N_DATA], cloud);//cloud = clouds[i%N_DATA];
 
     // If a cloud got captured from the device
     if(!cloud.empty())
@@ -163,17 +163,17 @@ main( int argc, char** argv )
 
       viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,0.8, "labeled voxels");
 
-      if(i == 10)
+      if(i >= 10)
       {
         tracker.setReferenceClouds(supervoxel_clusters);
-      }
-      else if (i>10)
-      {
+        //      }
+        //      else if (i>10)
+        //      {
         std::map< uint32_t, StateT> predicted_states(tracker.track(rgb_labeled_voxel_cloud));
         for (auto i: predicted_states)
         {
           uint32_t label = i.first;
-          std::cout << "label: " << i.first << " etat: " << i.second << " centroid of sv: " << supervoxel_clusters[i.first]->centroid_<< std::endl;
+//          std::cout << "label: " << i.first << " etat: " << i.second << " centroid of sv: " << supervoxel_clusters[i.first]->centroid_<< std::endl;
           pcl::tracking::ParticleFilterTracker< PointT, StateT>* trackerAt = tracker.getTrackerAt(label);
           ParticleFilter::PointCloudStatePtr particles = trackerAt->getParticles ();
 

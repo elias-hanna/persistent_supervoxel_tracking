@@ -53,6 +53,15 @@ namespace pcl
   class SequentialSV : public Supervoxel<PointT>
   {
     public:
+      SequentialSV(bool is_new):is_new_(is_new)
+      {
+
+      }
+
+      bool
+      isNew() const
+      { return is_new_; }
+
       using Supervoxel<PointT>::Supervoxel;
 
       typedef boost::shared_ptr<SequentialSV> Ptr;
@@ -72,6 +81,9 @@ namespace pcl
       using Supervoxel<PointT>::normals_;
       /** \brief A Pointcloud of the voxels with xyzrgb+label data in it */
       pcl::PointCloud<pcl::PointXYZRGBL> labeled_voxels_;
+    private:
+      /** \brief Boolean telling whether or not the supervoxel is new */
+      bool is_new_;
 
     public:
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -470,7 +482,8 @@ namespace pcl
 
           SequentialSupervoxelHelper (uint32_t label, SequentialSVClustering* parent_arg):
             label_ (label),
-            parent_ (parent_arg)
+            parent_ (parent_arg),
+            is_new_ (true)
           { }
 
           void
@@ -487,6 +500,14 @@ namespace pcl
 
           void
           updateCentroid ();
+
+          bool
+          isNew () const
+          { return is_new_; }
+
+          bool
+          setNew (bool is_new)
+          { is_new_ = is_new; }
 
           void
           getVoxels (typename pcl::PointCloud<PointT>::Ptr &voxels) const;
@@ -550,6 +571,7 @@ namespace pcl
           uint32_t label_;
           SequentialVoxelData centroid_;
           SequentialSVClustering* parent_;
+          bool is_new_;
         public:
           //Type VoxelData may have fixed-size Eigen objects inside
           EIGEN_MAKE_ALIGNED_OPERATOR_NEW

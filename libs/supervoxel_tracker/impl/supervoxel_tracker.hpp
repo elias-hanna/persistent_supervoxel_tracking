@@ -8,19 +8,28 @@ template <typename PointT, typename StateT> void
 pcl::SupervoxelTracker<PointT, StateT>::setReferenceClouds (SequentialSVMap supervoxel_clusters)
 {
   // Erase all previous trackers
-  trackers_.clear ();
-
+//  trackers_.clear ();
+  int i=0;
+  typename TrackerMapT::accessor a;
   // Iterate over all supervoxel clusters
   typename pcl::SequentialSVClustering<PointT>::SequentialSVMapT::iterator sv_itr;
   for(sv_itr = supervoxel_clusters.begin (); sv_itr != supervoxel_clusters.end (); ++sv_itr)
   {
     uint32_t label = sv_itr->first;
-    PointCloudPtrT target_cloud(new PointCloudT);
-    pcl::copyPointCloud (*(sv_itr->second->voxels_), *target_cloud);
-    PointT centroid;
-    pcl::copyPoint (sv_itr->second->centroid_, centroid);
-    addReferenceCloud(label, target_cloud);
+    if(sv_itr->second->isNew () || !(trackers_.find (a, label)))
+    {
+      i++;
+      // Remove the previous tracker on this label if there was one
+      trackers_.erase (label);
+      // Push the new reference cloud for this label
+      PointCloudPtrT target_cloud (new PointCloudT);
+      pcl::copyPointCloud (*(sv_itr->second->voxels_), *target_cloud);
+      PointT centroid;
+      pcl::copyPoint (sv_itr->second->centroid_, centroid);
+      addReferenceCloud(label, target_cloud);
+    }
   }
+  std::cout << "Number of new supervoxels: " << i << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -132,17 +141,17 @@ pcl::SupervoxelTracker<PointT, StateT>::track(PointCloudConstPtrT cloud)
 
   StateMap states;
   parallelTrack(&states, cloud_pass);
-//    typename TrackerMapT::iterator itr;
-//    for (itr = trackers_.begin(); itr != trackers_.end(); ++itr)
-//    {
-//      // Get the label of the current tracker being processed
-//      uint32_t label = itr->first;
-//      // Compute the new states
-//      itr->second->setInputCloud(cloud_pass_downsampled);
-//      itr->second->compute();
-//      // Add the predicted state to the return
-//      states.insert (std::make_pair(label, itr->second->getResult ()));
-//    }
+  //    typename TrackerMapT::iterator itr;
+  //    for (itr = trackers_.begin(); itr != trackers_.end(); ++itr)
+  //    {
+  //      // Get the label of the current tracker being processed
+  //      uint32_t label = itr->first;
+  //      // Compute the new states
+  //      itr->second->setInputCloud(cloud_pass_downsampled);
+  //      itr->second->compute();
+  //      // Add the predicted state to the return
+  //      states.insert (std::make_pair(label, itr->second->getResult ()));
+  //    }
   return states;
 }
 
