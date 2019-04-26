@@ -44,6 +44,7 @@
 #include <pcl/segmentation/supervoxel_clustering.h>
 #include "../octree/octree_pointcloud_sequential.h"
 #include <tbb/tbb.h>
+#include <pcl/recognition/ransac_based/obj_rec_ransac.h>
 
 namespace pcl
 {
@@ -162,8 +163,8 @@ namespace pcl
 
           // Use the methods from VoxelData
           /* REMOVED TO SUPPORT MORE POINT TYPES */
-//          using SupervoxelClustering<PointT>::VoxelData::getPoint;
-//          using SupervoxelClustering<PointT>::VoxelData::getNormal;
+          //          using SupervoxelClustering<PointT>::VoxelData::getPoint;
+          //          using SupervoxelClustering<PointT>::VoxelData::getNormal;
 
           /** \brief Gets the data of in the form of a point
            *  \param[out] point_arg Will contain the point value of the voxeldata
@@ -206,7 +207,7 @@ namespace pcl
       typedef std::map<uint32_t,typename SequentialSV<PointT>::Ptr> SequentialSVMapT;
 
       typedef typename pcl::PointCloud<PointT> PointCloudT;
-      typedef typename pcl::PointCloud<Normal> NormalCloudT;
+      typedef typename pcl::PointCloud<Normal> NormalCloud;
       typedef typename pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT> OctreeSequentialT;
       typedef typename pcl::octree::OctreePointCloudSearch <PointT> OctreeSearchT;
       typedef typename pcl::search::KdTree<PointT> KdTreeT;
@@ -303,7 +304,7 @@ namespace pcl
       * \param[in] normal_cloud The input normals
       */
       virtual void
-      setNormalCloud (typename NormalCloudT::ConstPtr normal_cloud);
+      setNormalCloud (typename NormalCloud::ConstPtr normal_cloud);
 
       pcl::PointCloud<pcl::PointXYZL>::Ptr
       getLabeledCloud () const;
@@ -327,6 +328,10 @@ namespace pcl
       /** \brief Returns a deep copy of the voxel centroid cloud */
       typename pcl::PointCloud<PointT>::Ptr
       getUnlabeledVoxelCentroidCloud () const;
+
+      /** \brief Returns a deep copy of the voxel normal cloud */
+      pcl::PointCloud<pcl::Normal>::Ptr
+      getVoxelNormalCloud () const;
 
       /** \brief Gets the adjacency list (Boost Graph library) which gives connections between supervoxels
        *  \param[out] adjacency_list_arg BGL graph where supervoxel labels are vertices, edges are touching relationships
@@ -424,7 +429,7 @@ namespace pcl
       typename PointCloudT::Ptr voxel_centroid_cloud_;
 
       /** \brief Contains the Normals of the input Cloud */
-      typename NormalCloudT::ConstPtr input_normals_;
+      typename NormalCloud::ConstPtr input_normals_;
 
       /** \brief Importance of color in clustering */
       float color_importance_;

@@ -102,7 +102,7 @@ pcl::SequentialSVClustering<PointT>::setInputCloud (const typename pcl::PointClo
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::setNormalCloud (typename NormalCloudT::ConstPtr normal_cloud)
+pcl::SequentialSVClustering<PointT>::setNormalCloud (typename NormalCloud::ConstPtr normal_cloud)
 {
   if ( normal_cloud->size () == 0 )
   {
@@ -127,15 +127,26 @@ pcl::SequentialSVClustering<PointT>::extract (std::map<uint32_t,typename Sequent
   timer_.reset ();
   double t_start = timer_.getTime ();
 
-  unsigned long nb_previous_supervoxel_clusters = supervoxel_clusters.size();
+  //  unsigned long nb_previous_supervoxel_clusters = supervoxel_clusters.size();
 
   buildVoxelCloud();
+
+  // Get the voxel normal cloud
+  NormalCloud::Ptr voxel_normal_cloud = getVoxelNormalCloud ();
 
   double t_update = timer_.getTime ();
 
   std::vector<int> seed_indices, existing_seed_indices;
 
   getPreviousSeedingPoints(supervoxel_clusters, existing_seed_indices);
+  /** Need a function that at each time step:
+   * - check if a label has disappeared or is occluded
+   * - look into the unlabeled voxel cloud if its in it with recognize from ObjRecRANSAC
+   * - if it is in it with sufficient certainty (look into object output) get the transformation found and translate the previous centroid
+   * in order to get a new seeding point (don't forget to keep the same label !!!)
+   * - Add all object model for next step
+   * THIS FUNCTION SHOULD BE BETWEEN getPreviousSeedingPoints AND pruneSeeds !
+   */
   pruneSeeds(existing_seed_indices, seed_indices);
   addHelpersFromUnlabeledSeedIndices(seed_indices);
 
@@ -242,7 +253,7 @@ pcl::SequentialSVClustering<PointT>::computeVoxelData ()
     //Verify that input normal cloud size is same as input cloud size
     assert (input_normals_->size () == input_->size ());
     //For every point in the input cloud, find its corresponding leaf
-    typename NormalCloudT::const_iterator normal_itr = input_normals_->begin ();
+    typename NormalCloud::const_iterator normal_itr = input_normals_->begin ();
     for (typename PointCloudT::const_iterator input_itr = input_->begin (); input_itr != input_->end (); ++input_itr, ++normal_itr)
     {
       //If the point is not finite we ignore it
@@ -432,6 +443,58 @@ pcl::SequentialSVClustering<PointT>::globalCheck()
 template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &supervoxel_clusters, std::vector<int>& existing_seed_indices)
 {
+  std::vector<uint32_t> labels_to_track;
+  // Get the labels of the disappeared and fully occluded supervoxels
+  if(getMaxLabel() > 0)
+  {
+    int nb_occluded_voxels_by_labels[getMaxLabel ()] = {0};
+    int nb_voxels_by_labels[getMaxLabel ()] = {0};
+    for(typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
+    {
+      SequentialVoxelData& voxel = (*leaf_itr)->getData ();
+      if(voxel.frame_occluded_ != 0) // It is currently occluded
+      {
+        ++nb_occluded_voxels_by_labels[voxel.label_ - 1];
+      }
+      ++nb_voxels_by_labels[voxel.label_ - 1];
+    }
+    for(uint32_t i= 1; i < getMaxLabel (); ++i)
+    {
+      // If the sv has disappeared or is fully occluded
+      if(nb_voxels_by_labels[i - 1] == 0 || ( (nb_voxels_by_labels[i - 1] == nb_occluded_voxels_by_labels[i - 1]) && (supervoxel_clusters.find(i) != supervoxel_clusters.end()) ) )
+      { labels_to_track.push_back(i); }
+//      std::cout << "Label: " << i << " | Occlusion: " << 100 * static_cast<double> (nb_occluded_voxels_by_labels[i - 1]) / nb_voxels_by_labels[i - 1] << " %\n";
+    }
+//    for(auto label: labels_to_track)
+//      std::cout << "To track: " << label << std::endl;
+  }
+
+  // Try to find the disappeared / occluded supervoxels in the new voxel cloud
+  pcl::recognition::ObjRecRANSAC tracker_ransac(seed_resolution_/4, resolution_);
+  // Macro turn degre to rad, here 3 deg is the default value (the one in the constructor)
+//  tracker_ransac.setMaxCoplanarityAngleDegrees(3.0f*AUX_DEG_TO_RADIANS);
+
+  for(auto label: labels_to_track)
+  {
+    pcl::PointCloud<pcl::PointXYZ> voxels_copy;
+    copyPointCloud(*(supervoxel_clusters[label]->voxels_), voxels_copy);
+    tracker_ransac.addModel(voxels_copy, *(supervoxel_clusters[label]->normals_), std::to_string(label));
+  }
+  std::list<pcl::recognition::ObjRecRANSAC::Output> recognized_objects;
+  double success_probability = 0.99;
+  pcl::PointCloud<pcl::PointXYZ> voxel_cloud_copy;
+  copyPointCloud(*(voxel_centroid_cloud_), voxel_cloud_copy);
+  tracker_ransac.recognize(voxel_cloud_copy, *getVoxelNormalCloud (), recognized_objects, success_probability);
+
+  for(auto output: recognized_objects)
+  {
+    std::cout << "Sv w/ label: " << output.object_name_ << " confidence: " << output.match_confidence_ << std::endl;
+  }
+
+  ////////////////////////////////////////////////
+  ////////////////////////////////////////////////
+  ////////////////////////////////////////////////
+
   existing_seed_indices.clear ();
   supervoxel_helpers_.clear ();
   typename SequentialSVMapT::iterator sv_itr;
@@ -442,7 +505,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
     // Push back a new supervoxel helper with an already existing label
     supervoxel_helpers_.push_back (new SequentialSupervoxelHelper(label,this));
     // Count the number of points belonging to that supervoxel and compute its centroid
-    int sum = 0;
+    int nb_of_points = 0;
     PointT centroid;
     centroid.getVector3fMap ().setZero ();
     for (typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
@@ -451,13 +514,13 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       if(voxel.label_ == label)
       {
         centroid.getVector3fMap () += voxel.xyz_;
-        sum += 1;
+        nb_of_points += 1;
       }
     }
     // If there was points in it, add the closest point in kdtree as the seed point for this supervoxel
-    if(sum != 0)
+    if(nb_of_points != 0)
     {
-      centroid.getVector3fMap () /= (double)sum;
+      centroid.getVector3fMap () /= static_cast<double> (nb_of_points);
       std::vector<int> closest_index;
       std::vector<float> distance;
       voxel_kdtree_->nearestKSearch (centroid, 1, closest_index, distance);
@@ -499,7 +562,7 @@ pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_
   //std::cout << "Number of seed points before filtering="<<voxel_centers.size ()<<std::endl;
 
   std::vector<int> seed_indices_orig;
-  seed_indices_orig.resize (num_seeds, 0);
+  seed_indices_orig.resize (static_cast<size_t> (num_seeds), 0);
   seed_indices.clear ();
   std::vector<int> closest_index;
   std::vector<float> distance;
@@ -511,7 +574,7 @@ pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_
     voxel_kdtree_ ->setInputCloud (unlabeled_voxel_centroid_cloud_);
   }
 
-  for (int i = 0; i < num_seeds; ++i)
+  for (size_t i = 0; i < num_seeds; ++i)
   {
     // Search for the nearest neighbour to voxel center[i], stores its index in closest_index and distance in distance
     voxel_kdtree_->nearestKSearch (voxel_centers[i], 1, closest_index, distance);
@@ -531,12 +594,12 @@ pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_
     int min_index = seed_indices_orig[i];
     bool not_too_close = true;
     // For all neighbours
-    for(int j = 0 ; j < neighbors.size() ; ++j )
+    for(size_t j = 0 ; j < neighbors.size() ; ++j )
     {
       if(not_too_close)
       {
         // For all existing seed indices
-        for(int k = 0 ; k < existing_seed_indices.size() ; ++k)
+        for(size_t k = 0 ; k < existing_seed_indices.size() ; ++k)
         {
           if(neighbors[j] == existing_seed_indices[k])
           {
@@ -818,6 +881,23 @@ pcl::SequentialSVClustering<PointT>::getUnlabeledVoxelCentroidCloud () const
   return centroid_copy;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> pcl::PointCloud<pcl::Normal>::Ptr
+pcl::SequentialSVClustering<PointT>::getVoxelNormalCloud () const
+{
+  NormalCloud::Ptr normal_cloud (new NormalCloud);
+  normal_cloud->resize(sequential_octree_->getLeafCount ());
+  NormalCloud::iterator normal_cloud_itr = normal_cloud->begin();
+  typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
+  for (int idx = 0 ; leaf_itr != sequential_octree_->end (); ++leaf_itr, ++normal_cloud_itr, ++idx)
+  {
+    SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
+    // Add the point to the normal cloud
+    new_voxel_data.getNormal (*normal_cloud_itr);
+  }
+  return normal_cloud;
+}
+
 template <typename PointT> pcl::PointCloud<pcl::PointXYZRGBA>::Ptr
 pcl::SequentialSVClustering<PointT>::getColoredVoxelCloud () const
 {
@@ -874,7 +954,6 @@ pcl::SequentialSVClustering<PointT>::getColoredCloud () const
 
   return (colored_cloud);
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> pcl::PointCloud<pcl::PointXYZL>::Ptr
@@ -951,7 +1030,6 @@ pcl::SequentialSVClustering<PointT>::getLabeledCloud () const
   }
   return (labeled_cloud);
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> float

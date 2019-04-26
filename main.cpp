@@ -21,10 +21,12 @@
 #define N_DATA 2
 // Types
 typedef pcl::tracking::ParticleXYZRPY StateT;
-typedef pcl::PointXYZRGBL PointT;
+typedef pcl::PointXYZRGBA PointT;
 typedef pcl::PointCloud<PointT> PointCloudT;
-typedef pcl::PointNormal PointNT;
-typedef pcl::PointCloud<PointNT> PointNCloudT;
+typedef pcl::PointNormal PointXYZN;
+typedef pcl::PointCloud<PointXYZN> PointCloudN;
+typedef pcl::Normal Normal;
+typedef pcl::PointCloud<Normal> NormalCloud;
 typedef pcl::PointXYZL PointLT;
 typedef pcl::PointCloud<PointLT> PointLCloudT;
 typedef pcl::PointXYZRGBL PointRGBLT;
@@ -146,6 +148,8 @@ main( int argc, char** argv )
       PointLCloudT::Ptr labeled_voxel_cloud = super.getLabeledVoxelCloud ();
       // Get the labeled voxel cloud
       PointRGBLCloudT::Ptr rgb_labeled_voxel_cloud = super.getLabeledRGBVoxelCloud ();
+      // Get the voxel normal cloud
+      NormalCloud::Ptr voxel_normal_cloud = super.getVoxelNormalCloud ();
 
       // Without color
       //      if (!viewer->updatePointCloud (voxel_centroid_cloud, "voxel centroids"))
@@ -163,43 +167,63 @@ main( int argc, char** argv )
 
       viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,0.8, "labeled voxels");
 
-      if(i >= 10)
-      {
-        tracker.setReferenceClouds(supervoxel_clusters);
-        //      }
-        //      else if (i>10)
-        //      {
-        std::map< uint32_t, StateT> predicted_states(tracker.track(rgb_labeled_voxel_cloud));
-        for (auto i: predicted_states)
-        {
-          uint32_t label = i.first;
-//          std::cout << "label: " << i.first << " etat: " << i.second << " centroid of sv: " << supervoxel_clusters[i.first]->centroid_<< std::endl;
-          pcl::tracking::ParticleFilterTracker< PointT, StateT>* trackerAt = tracker.getTrackerAt(label);
-          ParticleFilter::PointCloudStatePtr particles = trackerAt->getParticles ();
 
-          //Set pointCloud with particle's points
-          pcl::PointCloud<pcl::PointXYZ>::Ptr particle_cloud (new pcl::PointCloud<pcl::PointXYZ> ());
-          for (size_t i = 0; i < particles->points.size (); i++)
-          {
-            pcl::PointXYZ point;
+      ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+      ////////////////////////TEST////////////////////////
+      ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+      if(!viewer->updateSphere(supervoxel_clusters[92]->centroid_ , 0.005, 255, 0, 0))
+        viewer->addSphere(supervoxel_clusters[92]->centroid_ , 0.005, 255, 0, 0);
 
-            point.x = particles->points[i].x;
-            point.y = particles->points[i].y;
-            point.z = particles->points[i].z;
-            particle_cloud->points.push_back (point);
-            particle_cloud->points.push_back (pcl::PointXYZ(particles->points[i].x, particles->points[i].y, particles->points[i].z));
-          }
 
-          //Draw red particles
-          {
-            pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> red_color (particle_cloud, 250, 99, 71);
-            std::string str = "particle cloud " + std::to_string(label);
-            if (!viewer->updatePointCloud (particle_cloud, red_color, str))
-              viewer->addPointCloud (particle_cloud, red_color, str);
-          }
-        }
-      }
-      viewer->spinOnce (10);
+      ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+      ////////////////////////TEST////////////////////////
+      ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+//      if(false)//i >= 10)
+//      {
+//        pcl::StopWatch timer_;
+
+//        double init = timer_.getTime ();
+//        tracker.setReferenceClouds(supervoxel_clusters);
+//        //      }
+//        //      else if (i>10)
+//        //      {
+//        std::map< uint32_t, StateT> predicted_states(tracker.track(rgb_labeled_voxel_cloud));
+//        double end = timer_.getTime ();
+//        std::cout << "Temps de calcul filtre particulaire: " << end - init << " ms\n";
+//        for (auto i: predicted_states)
+//        {
+//          uint32_t label = i.first;
+////          std::cout << "label: " << i.first << " etat: " << i.second << " centroid of sv: " << supervoxel_clusters[i.first]->centroid_<< std::endl;
+//          pcl::tracking::ParticleFilterTracker< PointT, StateT>* trackerAt = tracker.getTrackerAt(label);
+//          ParticleFilter::PointCloudStatePtr particles = trackerAt->getParticles ();
+
+//          //Set pointCloud with particle's points
+//          pcl::PointCloud<pcl::PointXYZ>::Ptr particle_cloud (new pcl::PointCloud<pcl::PointXYZ> ());
+//          for (size_t i = 0; i < particles->points.size (); i++)
+//          {
+//            pcl::PointXYZ point;
+
+//            point.x = particles->points[i].x;
+//            point.y = particles->points[i].y;
+//            point.z = particles->points[i].z;
+//            particle_cloud->points.push_back (point);
+//            particle_cloud->points.push_back (pcl::PointXYZ(particles->points[i].x, particles->points[i].y, particles->points[i].z));
+//          }
+
+//          //Draw red particles
+//          {
+//            pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> red_color (particle_cloud, 250, 99, 71);
+//            std::string str = "particle cloud " + std::to_string(label);
+//            if (!viewer->updatePointCloud (particle_cloud, red_color, str))
+//              viewer->addPointCloud (particle_cloud, red_color, str);
+//          }
+//        }
+//      }
+      viewer->spinOnce (100);
 
       ++i;
     }
