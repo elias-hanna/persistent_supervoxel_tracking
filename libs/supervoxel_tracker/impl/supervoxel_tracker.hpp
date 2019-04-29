@@ -29,7 +29,6 @@ pcl::SupervoxelTracker<PointT, StateT>::setReferenceClouds (SequentialSVMap supe
       addReferenceCloud(label, target_cloud);
     }
   }
-  std::cout << "Number of new supervoxels: " << i << std::endl;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

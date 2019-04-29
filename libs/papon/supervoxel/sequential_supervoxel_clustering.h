@@ -292,7 +292,7 @@ namespace pcl
        * \param[out] supervoxel_clusters A map of labels to pointers to supervoxel structures
        */
       virtual void
-      extract (std::map<uint32_t,typename SequentialSV<PointT>::Ptr > &supervoxel_clusters);
+      extract (SequentialSVMapT &supervoxel_clusters);
 
       /** \brief This method sets the cloud to be supervoxelized
        * \param[in] cloud The cloud to be supervoxelize
@@ -399,7 +399,7 @@ namespace pcl
 
       /** \brief Constructs the map of supervoxel clusters from the internal supervoxel helpers */
       void
-      makeSupervoxels (std::map<uint32_t,typename SequentialSV<PointT>::Ptr > &supervoxel_clusters);
+      makeSupervoxels (SequentialSVMapT &supervoxel_clusters);
 
       void
       addHelpersFromUnlabeledSeedIndices(std::vector<int> &seed_indices);

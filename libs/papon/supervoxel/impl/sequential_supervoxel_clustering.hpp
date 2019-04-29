@@ -122,7 +122,7 @@ pcl::SequentialSVClustering<PointT>::~SequentialSVClustering ()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::extract (std::map<uint32_t,typename SequentialSV<PointT>::Ptr > &supervoxel_clusters)
+pcl::SequentialSVClustering<PointT>::extract (SequentialSVMapT &supervoxel_clusters)
 {
   timer_.reset ();
   double t_start = timer_.getTime ();
@@ -444,6 +444,8 @@ template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &supervoxel_clusters, std::vector<int>& existing_seed_indices)
 {
   std::vector<uint32_t> labels_to_track;
+  std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output> valid_outputs;
+
   // Get the labels of the disappeared and fully occluded supervoxels
   if(getMaxLabel() > 0)
   {
@@ -458,37 +460,68 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       }
       ++nb_voxels_by_labels[voxel.label_ - 1];
     }
-    for(uint32_t i= 1; i < getMaxLabel (); ++i)
+    for(auto pair: supervoxel_clusters)
     {
+      uint32_t i = pair.first;
       // If the sv has disappeared or is fully occluded
       if(nb_voxels_by_labels[i - 1] == 0 || ( (nb_voxels_by_labels[i - 1] == nb_occluded_voxels_by_labels[i - 1]) && (supervoxel_clusters.find(i) != supervoxel_clusters.end()) ) )
       { labels_to_track.push_back(i); }
-//      std::cout << "Label: " << i << " | Occlusion: " << 100 * static_cast<double> (nb_occluded_voxels_by_labels[i - 1]) / nb_voxels_by_labels[i - 1] << " %\n";
+      //      std::cout << "Label: " << i << " | Occlusion: " << 100 * static_cast<double> (nb_occluded_voxels_by_labels[i - 1]) / nb_voxels_by_labels[i - 1] << " %\n";
     }
-//    for(auto label: labels_to_track)
-//      std::cout << "To track: " << label << std::endl;
-  }
+    for(auto label: labels_to_track)
+      std::cout << "To track: " << label << "\t";
+    std::cout << "\n";
+    // Try to find the disappeared / occluded supervoxels in the new voxel cloud
+    pcl::recognition::ObjRecRANSAC tracker_ransac(seed_resolution_/2, resolution_);
+    // Macro turn degre to rad, here 3 deg is the default value (the one in the constructor)
+    //  tracker_ransac.setMaxCoplanarityAngleDegrees(3.0f*AUX_DEG_TO_RADIANS);
 
-  // Try to find the disappeared / occluded supervoxels in the new voxel cloud
-  pcl::recognition::ObjRecRANSAC tracker_ransac(seed_resolution_/4, resolution_);
-  // Macro turn degre to rad, here 3 deg is the default value (the one in the constructor)
-//  tracker_ransac.setMaxCoplanarityAngleDegrees(3.0f*AUX_DEG_TO_RADIANS);
+    for(auto label: labels_to_track)
+    {
+      pcl::PointCloud<pcl::PointXYZ> voxels_copy;
+      copyPointCloud(*(supervoxel_clusters[label]->voxels_), voxels_copy);
+      tracker_ransac.addModel(voxels_copy, *(supervoxel_clusters[label]->normals_), std::to_string(label));
+    }
+    std::list<pcl::recognition::ObjRecRANSAC::Output> recognized_objects;
+    double success_probability = 0.99;
+    pcl::PointCloud<pcl::PointXYZ> voxel_cloud_copy;
+    pcl::PointCloud<pcl::Normal> voxel_normal_cloud_copy;
+    copyPointCloud(*(unlabeled_voxel_centroid_cloud_), voxel_cloud_copy);
+    copyPointCloud(*getVoxelNormalCloud (), voxel_normal_cloud_copy);
 
-  for(auto label: labels_to_track)
-  {
-    pcl::PointCloud<pcl::PointXYZ> voxels_copy;
-    copyPointCloud(*(supervoxel_clusters[label]->voxels_), voxels_copy);
-    tracker_ransac.addModel(voxels_copy, *(supervoxel_clusters[label]->normals_), std::to_string(label));
-  }
-  std::list<pcl::recognition::ObjRecRANSAC::Output> recognized_objects;
-  double success_probability = 0.99;
-  pcl::PointCloud<pcl::PointXYZ> voxel_cloud_copy;
-  copyPointCloud(*(voxel_centroid_cloud_), voxel_cloud_copy);
-  tracker_ransac.recognize(voxel_cloud_copy, *getVoxelNormalCloud (), recognized_objects, success_probability);
+    tracker_ransac.recognize(voxel_cloud_copy, voxel_normal_cloud_copy, recognized_objects, success_probability);
 
-  for(auto output: recognized_objects)
-  {
-    std::cout << "Sv w/ label: " << output.object_name_ << " confidence: " << output.match_confidence_ << std::endl;
+    float threshold = 0.7f;
+    for(auto output: recognized_objects)
+    {
+      uint32_t label = std::stoi(output.object_name_);
+      //      std::cout << "Sv w/ label: " << label << " confidence: " << output.match_confidence_ << "\n";
+      // If this match exceeds threshold
+      if(true)//output.match_confidence_ > threshold)
+      {
+        auto it_at = valid_outputs.find(label);
+        // There was already a valid match
+        if(it_at != valid_outputs.end())
+        {
+          // Check if this valid match is better
+          if(it_at->second.match_confidence_ < output.match_confidence_)
+          {
+            it_at->second = output;
+          }
+        }
+        // There was no previous valid match
+        else
+        {
+          valid_outputs.insert(std::pair<uint32_t, pcl::recognition::ObjRecRANSAC::Output> (label, output));
+        }
+      }
+    }
+    for(auto output: valid_outputs)
+    {
+      std::cout << "label valid: " << std::stoi(output.second.object_name_) << " x: " << output.second.rigid_transform_[9] << " y: " << output.second.rigid_transform_[10] << " z: " << output.second.rigid_transform_[11] << "\n";
+      //      std::cout << "Valid </label: " << output.second.object_name_ << " confidence: " << output.second.match_confidence_ << "\n";
+    }
+
   }
 
   ////////////////////////////////////////////////
@@ -499,7 +532,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
   supervoxel_helpers_.clear ();
   typename SequentialSVMapT::iterator sv_itr;
   // Iterate over all previous supervoxel clusters
-  for(sv_itr = supervoxel_clusters.begin (); sv_itr != supervoxel_clusters.end (); ++sv_itr)
+  for (sv_itr = supervoxel_clusters.begin (); sv_itr != supervoxel_clusters.end (); ++sv_itr)
   {
     uint32_t label = sv_itr->first;
     // Push back a new supervoxel helper with an already existing label
@@ -517,29 +550,41 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
         nb_of_points += 1;
       }
     }
+    // If the supervoxel was found using the matching method
+    if (valid_outputs.find(label) != valid_outputs.end ())
+    {
+      std::cout << "Labelo: " << label << "\n";
+      float x = valid_outputs.find(label)->second.rigid_transform_[9];
+      float y = valid_outputs.find(label)->second.rigid_transform_[10];
+      float z = valid_outputs.find(label)->second.rigid_transform_[11];
+      Eigen::Vector3f transform (x, y, z);
+      // Compute new centroid from matching method transform
+      centroid.getVector3fMap () = supervoxel_clusters[label]->centroid_.getVector3fMap () + transform;
+    }
     // If there was points in it, add the closest point in kdtree as the seed point for this supervoxel
-    if(nb_of_points != 0)
+    else if (nb_of_points != 0)
     {
       centroid.getVector3fMap () /= static_cast<double> (nb_of_points);
-      std::vector<int> closest_index;
-      std::vector<float> distance;
-      voxel_kdtree_->nearestKSearch (centroid, 1, closest_index, distance);
-      LeafContainerT* seed_leaf = sequential_octree_->at (closest_index[0]);
-      if (seed_leaf)
-      {
-        existing_seed_indices.push_back (closest_index[0]);
-        (supervoxel_helpers_.back()).addLeaf(seed_leaf);
-        (supervoxel_helpers_.back()).setNew(false);
-      }
-      else
-      {
-        PCL_WARN ("Could not find leaf in pcl::SequentialSVClustering<PointT>::createHelpersFromWeightMaps - supervoxel will be deleted \n");
-      }
     }
-    // If there was no point in this supervoxel, just remove it
+    // If there was no point in this supervoxel at this frame, just remove it
     else
     {
       supervoxel_helpers_.pop_back();
+      continue;
+    }
+    std::vector<int> closest_index;
+    std::vector<float> distance;
+    voxel_kdtree_->nearestKSearch (centroid, 1, closest_index, distance);
+    LeafContainerT* seed_leaf = sequential_octree_->at (closest_index[0]);
+    if (seed_leaf)
+    {
+      existing_seed_indices.push_back (closest_index[0]);
+      (supervoxel_helpers_.back()).addLeaf(seed_leaf);
+      (supervoxel_helpers_.back()).setNew(false);
+    }
+    else
+    {
+      PCL_WARN ("Could not find leaf in pcl::SequentialSVClustering<PointT>::createHelpersFromWeightMaps - supervoxel will be deleted \n");
     }
   }
 }
@@ -559,7 +604,7 @@ pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_
   // std::cout << "Size of octree ="<<seed_octree.getLeafCount ()<<"\n";
   std::vector<PointT, Eigen::aligned_allocator<PointT> > voxel_centers;
   int num_seeds = seed_octree.getOccupiedVoxelCenters(voxel_centers);
-  //std::cout << "Number of seed points before filtering="<<voxel_centers.size ()<<std::endl;
+  //std::cout << "Number of seed points before filtering="<<voxel_centers.size ()<<"\n";
 
   std::vector<int> seed_indices_orig;
   seed_indices_orig.resize (static_cast<size_t> (num_seeds), 0);
