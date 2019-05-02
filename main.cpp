@@ -46,7 +46,8 @@ main( int argc, char** argv )
                                "-s <seed resolution>\n"
                                "-c <color weight> \n"
                                "-z <spatial weight> \n"
-                               "-n <normal_weight>\n", argv[0]);
+                               "-n <normal_weight>\n"
+                               "-t <time pause between frames>\n", argv[0]);
     return 1;
   }
 
@@ -55,7 +56,7 @@ main( int argc, char** argv )
   if (voxel_res_specified)
     pcl::console::parse (argc, argv, "-v", voxel_resolution);
 
-  float seed_resolution = 0.12f;
+  float seed_resolution = 0.08f;
   bool seed_res_specified = pcl::console::find_switch (argc, argv, "-s");
   if (seed_res_specified)
     pcl::console::parse (argc, argv, "-s", seed_resolution);
@@ -71,6 +72,10 @@ main( int argc, char** argv )
   float normal_importance = 1.0f;
   if (pcl::console::find_switch (argc, argv, "-n"))
     pcl::console::parse (argc, argv, "-n", normal_importance);
+
+  int time_pause_in_ms = 100;
+  if (pcl::console::find_switch(argc, argv, "-t"))
+    pcl::console::parse (argc, argv, "-t", time_pause_in_ms);
 
   // OpenNIGrabber, used to capture pointclouds from various rgbd cameras
   boost::shared_ptr<pcl::Grabber> grabber = boost::make_shared<pcl::OpenNIGrabber>();
@@ -150,26 +155,26 @@ main( int argc, char** argv )
       NormalCloud::Ptr voxel_normal_cloud = super.getVoxelNormalCloud ();
 
       // Show the unlabeled voxel cloud in green
-//      PointCloudT::Ptr unlabeled_voxel_centroid_cloud = super.getUnlabeledVoxelCentroidCloud ();
-//      pcl::visualization::PointCloudColorHandlerCustom<PointT> single_color (unlabeled_voxel_centroid_cloud, 0, 255, 0);
-//      if(!viewer->updatePointCloud<PointT>(unlabeled_voxel_centroid_cloud, single_color, "voxel centroids"))
-//        viewer->addPointCloud<PointT> (unlabeled_voxel_centroid_cloud, single_color, "voxel centroids");
+      //      PointCloudT::Ptr unlabeled_voxel_centroid_cloud = super.getUnlabeledVoxelCentroidCloud ();
+      //      pcl::visualization::PointCloudColorHandlerCustom<PointT> single_color (unlabeled_voxel_centroid_cloud, 0, 255, 0);
+      //      if(!viewer->updatePointCloud<PointT>(unlabeled_voxel_centroid_cloud, single_color, "voxel centroids"))
+      //        viewer->addPointCloud<PointT> (unlabeled_voxel_centroid_cloud, single_color, "voxel centroids");
       // Without color
       //      if (!viewer->updatePointCloud (voxel_centroid_cloud, "voxel centroids"))
       //        viewer->addPointCloud (voxel_centroid_cloud, "voxel centroids");
       // With color
-//      pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgb(voxel_centroid_cloud);
-//      if (!viewer->updatePointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids"))
-//        viewer->addPointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids");
+      //      pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgb(voxel_centroid_cloud);
+      //      if (!viewer->updatePointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids"))
+      //        viewer->addPointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids");
 
 
-      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,2.0, "voxel centroids");
-      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,0.5, "voxel centroids");
+      //      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,2.0, "voxel centroids");
+      //      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,1, "voxel centroids");
 
       if (!viewer->updatePointCloud (labeled_voxel_cloud, "labeled voxels"))
         viewer->addPointCloud (labeled_voxel_cloud, "labeled voxels");
 
-      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,0.8, "labeled voxels");
+      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,1, "labeled voxels");
 
 
       ////////////////////////////////////////////////////
@@ -177,11 +182,52 @@ main( int argc, char** argv )
       ////////////////////////TEST////////////////////////
       ////////////////////////////////////////////////////
       ////////////////////////////////////////////////////
-      uint32_t label = 92;
-      if(!viewer->updateSphere(supervoxel_clusters[label]->centroid_ , 0.005, 255, 0, 0))
-        viewer->addSphere(supervoxel_clusters[label]->centroid_ , 0.005, 255, 0, 0);
+      //      uint32_t label = 124;
+      //      if(!viewer->updateSphere(supervoxel_clusters[label]->centroid_ , 0.005, 255, 0, 0))
+      //        viewer->addSphere(supervoxel_clusters[label]->centroid_ , 0.005, 255, 0, 0);
 
+      //      PointT pt1;
+      //      pt1.x = 0.011487;
+      //      pt1.y = 0.131805;
+      //      pt1.z = 0.649465;
+      //      PointT pt2;
+      //      pt2.x = 0.011487;
+      //      pt2.y = 0.131805;
+      //      pt2.z = 0.649465;
 
+      //      PointT pt1;
+      //      pt1.x = 0;
+      //      pt1.y = 0;
+      //      pt1.z = 0;
+      //      PointT pt2;
+      //      pt2.x = 1;
+      //      pt2.y = 0;
+      //      pt2.z = 0;
+
+      //      viewer->addLine(pt1, pt2, 255, 0, 0);
+
+      std::unordered_map<uint32_t, std::pair<Eigen::Vector3f, Eigen::Vector3f>> lines = super.lines_;
+      std::vector<uint32_t> label_color = super.getLabelColors ();
+      for (auto line: lines)
+      {
+        uint32_t color = label_color[line.first];
+        double r = static_cast<double> (static_cast<uint8_t> (color >> 16));
+        double g = static_cast<double> (static_cast<uint8_t> (color >> 8));
+        double b = static_cast<double> (static_cast<uint8_t> (color));
+        //        std::cout << "r: " << r << " g: " << g << " b: " << b << "\n";
+        PointT pt1;
+        pt1.x = line.second.first[0];
+        pt1.y = line.second.first[1];
+        pt1.z = line.second.first[2];
+        PointT pt2;
+        pt2.x = line.second.second[0];
+        pt2.y = line.second.second[1];
+        pt2.z = line.second.second[2];
+        viewer->addLine (pt1, pt2, r/255, g/255, b/255, std::to_string (line.first));
+
+        viewer->addSphere(pt1, 0.005, 0, 255, 0, "start " + std::to_string (line.first));
+        viewer->addSphere(pt2, 0.005, 255, 0, 0, "end " + std::to_string (line.first));
+      }
       ////////////////////////////////////////////////////
       ////////////////////////////////////////////////////
       ////////////////////////TEST////////////////////////
@@ -228,8 +274,16 @@ main( int argc, char** argv )
       //          }
       //        }
       //      }
-      viewer->spinOnce (10000);
-
+      if(i!=0)
+        viewer->spinOnce (time_pause_in_ms);
+      else
+        viewer->spinOnce (100);
+      for (auto line: lines)
+      {
+        viewer->removeShape(std::to_string (line.first));
+        viewer->removeShape("start " + std::to_string (line.first));
+        viewer->removeShape("end " + std::to_string (line.first));
+      }
       ++i;
     }
   }

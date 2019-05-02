@@ -129,10 +129,9 @@ pcl::SequentialSVClustering<PointT>::extract (SequentialSVMapT &supervoxel_clust
 
   //  unsigned long nb_previous_supervoxel_clusters = supervoxel_clusters.size();
 
+  // Maybe try to do something where this method is either called here or when clouds are matched to
+  // restrain from computing two times the normals (even if they are parallelized)
   buildVoxelCloud();
-
-  // Get the voxel normal cloud
-  NormalCloud::Ptr voxel_normal_cloud = getVoxelNormalCloud ();
 
   double t_update = timer_.getTime ();
 
@@ -152,7 +151,7 @@ pcl::SequentialSVClustering<PointT>::extract (SequentialSVMapT &supervoxel_clust
 
   double t_seeds = timer_.getTime ();
 
-  int max_depth = static_cast<int> (sqrt(2)*seed_resolution_/resolution_);
+  int max_depth = static_cast<int> (1.8f*seed_resolution_/resolution_);
   expandSupervoxels (max_depth);
 
   double t_iterate = timer_.getTime ();
@@ -336,10 +335,10 @@ pcl::SequentialSVClustering<PointT>::getAvailableLabels ()
 {
   std::vector<int> available_labels;
   // Fill the vector with 1, 2, ..., max label
-  for(int i = 1 ; i < getMaxLabel() ; ++i) { available_labels.push_back(i); }
+  for(int i = 1 ; i < getMaxLabel () ; ++i) { available_labels.push_back (i); }
   for (typename HelperListT::iterator sv_itr = supervoxel_helpers_.begin (); sv_itr != supervoxel_helpers_.end (); ++sv_itr)
   {
-    available_labels.erase(std::remove(available_labels.begin(), available_labels.end(), sv_itr->getLabel()), available_labels.end());
+    available_labels.erase (std::remove(available_labels.begin(), available_labels.end(), sv_itr->getLabel ()), available_labels.end());
   }
   return available_labels;
 }
@@ -390,6 +389,7 @@ pcl::SequentialSVClustering<PointT>::makeSupervoxels (SequentialSVMapT &supervox
   }
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::globalCheck()
 {
@@ -439,9 +439,10 @@ pcl::SequentialSVClustering<PointT>::globalCheck()
     nb_of_unlabeled_voxels_ = sequential_octree_->getLeafCount();
   }
 }
+
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &supervoxel_clusters, std::vector<int>& existing_seed_indices)
+template <typename PointT> std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output>
+pcl::SequentialSVClustering<PointT>::getMatches (SequentialSVMapT supervoxel_clusters)
 {
   std::vector<uint32_t> labels_to_track;
   std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output> valid_outputs;
@@ -460,19 +461,19 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       }
       ++nb_voxels_by_labels[voxel.label_ - 1];
     }
-    for(auto pair: supervoxel_clusters)
+    for(auto cluster: supervoxel_clusters)
     {
-      uint32_t i = pair.first;
+      uint32_t i = cluster.first;
       // If the sv has disappeared or is fully occluded
       if(nb_voxels_by_labels[i - 1] == 0 || ( (nb_voxels_by_labels[i - 1] == nb_occluded_voxels_by_labels[i - 1]) && (supervoxel_clusters.find(i) != supervoxel_clusters.end()) ) )
       { labels_to_track.push_back(i); }
       //      std::cout << "Label: " << i << " | Occlusion: " << 100 * static_cast<double> (nb_occluded_voxels_by_labels[i - 1]) / nb_voxels_by_labels[i - 1] << " %\n";
     }
     for(auto label: labels_to_track)
-      std::cout << "To track: " << label << "\t";
-    std::cout << "\n";
+      std::cout << "To track: " << label << "\n";
     // Try to find the disappeared / occluded supervoxels in the new voxel cloud
-    pcl::recognition::ObjRecRANSAC tracker_ransac(seed_resolution_/2, resolution_);
+    pcl::recognition::ObjRecRANSAC tracker_ransac(seed_resolution_*0.5, resolution_);
+    tracker_ransac.icpHypothesesRefinementOff ();
     // Macro turn degre to rad, here 3 deg is the default value (the one in the constructor)
     //  tracker_ransac.setMaxCoplanarityAngleDegrees(3.0f*AUX_DEG_TO_RADIANS);
 
@@ -487,17 +488,17 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
     pcl::PointCloud<pcl::PointXYZ> voxel_cloud_copy;
     pcl::PointCloud<pcl::Normal> voxel_normal_cloud_copy;
     copyPointCloud(*(unlabeled_voxel_centroid_cloud_), voxel_cloud_copy);
-    copyPointCloud(*getVoxelNormalCloud (), voxel_normal_cloud_copy);
+    copyPointCloud(*getUnlabeledVoxelNormalCloud (), voxel_normal_cloud_copy);
 
     tracker_ransac.recognize(voxel_cloud_copy, voxel_normal_cloud_copy, recognized_objects, success_probability);
 
-    float threshold = 0.7f;
+    float threshold = 0.0f;
     for(auto output: recognized_objects)
     {
       uint32_t label = std::stoi(output.object_name_);
-      //      std::cout << "Sv w/ label: " << label << " confidence: " << output.match_confidence_ << "\n";
+
       // If this match exceeds threshold
-      if(true)//output.match_confidence_ > threshold)
+      if(output.match_confidence_ > threshold)
       {
         auto it_at = valid_outputs.find(label);
         // There was already a valid match
@@ -516,14 +517,29 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
         }
       }
     }
+    // Update the octree and the voxel clouds
+    std::vector<uint32_t> labels;
     for(auto output: valid_outputs)
     {
-      std::cout << "label valid: " << std::stoi(output.second.object_name_) << " x: " << output.second.rigid_transform_[9] << " y: " << output.second.rigid_transform_[10] << " z: " << output.second.rigid_transform_[11] << "\n";
-      //      std::cout << "Valid </label: " << output.second.object_name_ << " confidence: " << output.second.match_confidence_ << "\n";
+      std::cout << "Matched: " << output.second.object_name_ << "\n";
+      for(auto val: output.second.rigid_transform_)
+        std::cout << val << " ";
+      std::cout << "\n";
+      labels.push_back(static_cast<uint32_t> (std::stoi(output.second.object_name_)));
     }
+    //    sequential_octree_->updateOctreeFromMatchedClouds(labels);
 
+    //    computeVoxelData (); // COULD DO BETTER DON'T NEED TO RECALCULATE THE NORMALS
   }
+  return valid_outputs;
+}
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> void
+pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &supervoxel_clusters, std::vector<int>& existing_seed_indices)
+{
+  std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output> matches = getMatches(supervoxel_clusters);
+  lines_.clear ();
   ////////////////////////////////////////////////
   ////////////////////////////////////////////////
   ////////////////////////////////////////////////
@@ -551,15 +567,36 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       }
     }
     // If the supervoxel was found using the matching method
-    if (valid_outputs.find(label) != valid_outputs.end ())
+    if (matches.find(label) != matches.end ())
     {
-      std::cout << "Labelo: " << label << "\n";
-      float x = valid_outputs.find(label)->second.rigid_transform_[9];
-      float y = valid_outputs.find(label)->second.rigid_transform_[10];
-      float z = valid_outputs.find(label)->second.rigid_transform_[11];
+      //      std::cout << "Label: " << label << "\n";
+      pcl::PointXYZRGBA prev_centroid = supervoxel_clusters[label]->centroid_;
+      float prev_x = prev_centroid.x;
+      float prev_y = prev_centroid.y;
+      float prev_z = prev_centroid.z;
+      float x = matches.find(label)->second.rigid_transform_[9] // Translation part
+          // Rotational part
+          + matches.find(label)->second.rigid_transform_[0]*prev_x
+          + matches.find(label)->second.rigid_transform_[1]*prev_y
+          + matches.find(label)->second.rigid_transform_[2]*prev_z;
+      float y = matches.find(label)->second.rigid_transform_[10] // Translation part
+          // Rotational part
+          + matches.find(label)->second.rigid_transform_[3]*prev_x
+          + matches.find(label)->second.rigid_transform_[4]*prev_y
+          + matches.find(label)->second.rigid_transform_[5]*prev_z;
+      float z = matches.find(label)->second.rigid_transform_[11] // Translation part
+          // Rotational part
+          + matches.find(label)->second.rigid_transform_[6]*prev_x
+          + matches.find(label)->second.rigid_transform_[7]*prev_y
+          + matches.find(label)->second.rigid_transform_[8]*prev_z;
+
       Eigen::Vector3f transform (x, y, z);
+      Eigen::Vector3f new_centroid = transform;//Eigen::Vector3f(prev_x, prev_y, prev_z) + transform;
+      lines_.insert (std::pair<uint32_t, std::pair<Eigen::Vector3f, Eigen::Vector3f>> (label, std::pair<Eigen::Vector3f, Eigen::Vector3f> (Eigen::Vector3f(prev_x, prev_y, prev_z), new_centroid)));
+      //      std::cout << "transform: " << x << " " << y << " " << z << "\n";
+      //      std::cout << "\npt before: \n" << prev_centroid << "\nAfter:\n" << new_centroid;
       // Compute new centroid from matching method transform
-      centroid.getVector3fMap () = supervoxel_clusters[label]->centroid_.getVector3fMap () + transform;
+      centroid.getVector3fMap () = transform;//supervoxel_clusters[label]->centroid_.getVector3fMap () + transform;
     }
     // If there was points in it, add the closest point in kdtree as the seed point for this supervoxel
     else if (nb_of_points != 0)
@@ -613,11 +650,6 @@ pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_
   std::vector<float> distance;
   closest_index.resize(1,0);
   distance.resize(1,0);
-  if (voxel_kdtree_ == 0)
-  {
-    voxel_kdtree_.reset (new pcl::search::KdTree<PointT>);
-    voxel_kdtree_ ->setInputCloud (unlabeled_voxel_centroid_cloud_);
-  }
 
   for (size_t i = 0; i < num_seeds; ++i)
   {
@@ -629,7 +661,7 @@ pcl::SequentialSVClustering<PointT>::pruneSeeds(std::vector<int> &existing_seed_
   std::vector<int> neighbors;
   std::vector<float> sqr_distances;
   seed_indices.reserve (seed_indices_orig.size ());
-  float search_radius = 0.5f*seed_resolution_;
+  float search_radius = 0.51f*seed_resolution_;
   // This is 1/20th of the number of voxels which fit in a planar slice through search volume
   // Area of planar slice / area of voxel side. (Note: This is smaller than the value mentioned in the original paper)
   float min_points = 0.05f * (search_radius)*(search_radius) * 3.1415926536f  / (resolution_*resolution_);
@@ -943,6 +975,26 @@ pcl::SequentialSVClustering<PointT>::getVoxelNormalCloud () const
   return normal_cloud;
 }
 
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> pcl::PointCloud<pcl::Normal>::Ptr
+pcl::SequentialSVClustering<PointT>::getUnlabeledVoxelNormalCloud () const
+{
+  NormalCloud::Ptr normal_cloud (new NormalCloud);
+  normal_cloud->resize(sequential_octree_->getLeafCount ());
+  NormalCloud::iterator normal_cloud_itr = normal_cloud->begin();
+  typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
+  for (int idx = 0 ; leaf_itr != sequential_octree_->end (); ++leaf_itr, ++normal_cloud_itr, ++idx)
+  {
+    SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
+    if(new_voxel_data.label_ == -1)
+    {
+      // Add the point to the normal cloud
+      new_voxel_data.getNormal (*normal_cloud_itr);
+    }
+  }
+  return normal_cloud;
+}
+
 template <typename PointT> pcl::PointCloud<pcl::PointXYZRGBA>::Ptr
 pcl::SequentialSVClustering<PointT>::getColoredVoxelCloud () const
 {
@@ -1140,6 +1192,13 @@ template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::setIgnoreInputNormals (bool val)
 {
   ignore_input_normals_ = val;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> std::vector<uint32_t>
+pcl::SequentialSVClustering<PointT>::getLabelColors ()
+{
+  return label_colors_;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

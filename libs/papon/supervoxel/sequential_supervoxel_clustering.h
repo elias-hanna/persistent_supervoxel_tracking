@@ -100,6 +100,10 @@ namespace pcl
       class SequentialSupervoxelHelper;
       friend class SequentialSupervoxelHelper;
     public:
+      std::unordered_map<uint32_t, std::pair<Eigen::Vector3f, Eigen::Vector3f>> lines_;
+
+      std::vector<uint32_t>
+      getLabelColors ();
       /** \brief VoxelData is a structure used for storing data within a pcl::octree::OctreePointCloudAdjacencyContainer
        *  \note It stores xyz, rgb, normal, distance, an index, and an owner.
        */
@@ -333,6 +337,10 @@ namespace pcl
       pcl::PointCloud<pcl::Normal>::Ptr
       getVoxelNormalCloud () const;
 
+      /** \brief Returns a deep copy of the unlabeled voxel normal cloud */
+      pcl::PointCloud<pcl::Normal>::Ptr
+      getUnlabeledVoxelNormalCloud () const;
+
       /** \brief Gets the adjacency list (Boost Graph library) which gives connections between supervoxels
        *  \param[out] adjacency_list_arg BGL graph where supervoxel labels are vertices, edges are touching relationships
        */
@@ -363,6 +371,13 @@ namespace pcl
        */
       void
       globalCheck ();
+
+      /** \brief This method uses a RANSAC based algorithm to find matches to disappeared/occluded supervoxels from previous
+       * frame that woud appear in the current frame
+       * \param[out] matches found in the form of an STL unordered map with label as key and pcl::recognition::ObjRecRANSAC::Output as value
+       */
+      std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output>
+      getMatches (SequentialSVMapT supervoxel_clusters);
 
       /** \brief Compute the voxel data (index of each voxel in the octree and normal of each voxel) */
       void

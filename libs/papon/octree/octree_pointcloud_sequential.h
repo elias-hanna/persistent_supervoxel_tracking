@@ -119,6 +119,10 @@ namespace pcl
         void
         addPointsFromInputCloud ();
 
+        /** \brief Update the octree by removing the matched occluded clouds */
+        void
+        updateOctreeFromMatchedClouds (std::vector<uint32_t> labels);
+
         /** \brief Defines the size of the bounding box
          */
         void
@@ -130,6 +134,11 @@ namespace pcl
           * \param[out] key_arg Resulting octree key */
         void
         genOctreeKeyforPoint (const PointT& point_arg, OctreeKey& key_arg) const;
+
+        /** \brief Delete leaf node / voxel at given point.
+         * \param[in] point_arg	point addressing the voxel to be deleted. */
+        void
+        deleteVoxelAtPoint (const PointT& point_arg);
 
         /** \brief Set the difference function which is used to evaluate if a leaf has changed
           *
@@ -301,6 +310,9 @@ namespace pcl
 
         //Maximum number of threads to use
         int threads_;
+
+        // Number of deleted leaves this frame
+        int nb_deleted_;
 
         //Stores whether the keys stored in the key vector are currently valid
         bool stored_keys_valid_;
