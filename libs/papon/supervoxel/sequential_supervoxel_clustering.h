@@ -45,6 +45,8 @@
 #include "../octree/octree_pointcloud_sequential.h"
 #include <tbb/tbb.h>
 #include <pcl/recognition/ransac_based/obj_rec_ransac.h>
+//// Turn off the verbose
+//#undef OBJ_REC_RANSAC_VERBOSE
 
 namespace pcl
 {
@@ -436,6 +438,9 @@ namespace pcl
 
       /** \brief Octree Sequential structure with leaves at voxel resolution */
       typename OctreeSequentialT::Ptr sequential_octree_;
+
+      /** \brief Octree Sequential structure with leaves at voxel resolution */
+      typename OctreeSequentialT::Ptr prev_sequential_octree_;
 
       /** \brief Contains the Voxelized centroid cloud of the unlabeled voxels */
       typename PointCloudT::Ptr unlabeled_voxel_centroid_cloud_;

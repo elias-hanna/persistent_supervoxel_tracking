@@ -43,19 +43,40 @@ add_library(lib_papon ${SRCS_PAPON} ${HEADERS_PAPON} ${IMPL_HEADERS_PAPON})
 set(SRCS_TRACKER
     supervoxel_tracker/src/supervoxel_tracker.cpp
     )
+
 set(HEADERS_TRACKER
     supervoxel_tracker/supervoxel_tracker.h
     supervoxel_tracker/label_coherence.h
     papon/supervoxel/sequential_supervoxel_clustering.h
     )
+
 set(IMPL_HEADERS_TRACKER
     supervoxel_tracker/impl/supervoxel_tracker.hpp
     supervoxel_tracker/impl/label_coherence.hpp
     )
+
 # Add libraries (directories with sources files)
 add_library(lib_tracker ${SRCS_TRACKER} ${HEADERS_TRACKER} ${IMPL_HEADERS_TRACKER})
 target_include_directories(lib_tracker PUBLIC "papon/")
 target_link_libraries (lib_tracker lib_papon)
+
+########################### SequentialSupervoxelClustering Library ##########################
+# Create variables with the files to compile
+set(SRCS_RANSAC
+    # ObjRecRANSACColor
+    recognition/src/obj_rec_ransac_color.cpp
+    )
+
+set(HEADERS_RANSAC
+    # ObjRecRANSACColor
+    recognition/obj_rec_ransac_color.h
+    )
+
+set(IMPL_HEADERS_RANSAC
+    )
+
+# Add libraries (directories with sources files)
+#add_library(lib_RANSAC ${SRCS_RANSAC} ${HEADERS_RANSAC} ${IMPL_HEADERS_RANSAC})
 
 ########################### PCL Library ##########################
 # Check for extern dependecies
@@ -67,6 +88,8 @@ if (PCL_FOUND)
   target_link_libraries (lib_papon ${PCL_LIBRARIES})
   target_include_directories(lib_tracker PUBLIC ${PCL_INCLUDE_DIRS})
   target_link_libraries (lib_tracker ${PCL_LIBRARIES})
+#  target_include_directories(lib_RANSAC PUBLIC ${PCL_INCLUDE_DIRS})
+#  target_link_libraries (lib_RANSAC ${PCL_LIBRARIES})
 else ()
   # Sinon, nous affichons un message
   message(FATAL_ERROR "PCL not found")

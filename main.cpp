@@ -128,8 +128,8 @@ main( int argc, char** argv )
   while(!viewer->wasStopped ())
   {
     // Get the cloud
-    //    copyPointCloud(getter.getCloud(), cloud);
-    copyPointCloud(*clouds[i%N_DATA], cloud);//cloud = clouds[i%N_DATA];
+    copyPointCloud(getter.getCloud(), cloud);
+//    copyPointCloud(*clouds[i%N_DATA], cloud);//cloud = clouds[i%N_DATA];
 
     // If a cloud got captured from the device
     if(!cloud.empty())
