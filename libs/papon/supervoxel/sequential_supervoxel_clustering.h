@@ -45,6 +45,8 @@
 #include "../octree/octree_pointcloud_sequential.h"
 #include <tbb/tbb.h>
 #include <pcl/recognition/ransac_based/obj_rec_ransac.h>
+#include <pcl/keypoints/sift_keypoint.h>
+//#include <random>
 //// Turn off the verbose
 //#undef OBJ_REC_RANSAC_VERBOSE
 

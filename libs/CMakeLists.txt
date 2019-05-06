@@ -62,18 +62,18 @@ target_link_libraries (lib_tracker lib_papon)
 
 ########################### SequentialSupervoxelClustering Library ##########################
 # Create variables with the files to compile
-set(SRCS_RANSAC
-    # ObjRecRANSACColor
-    recognition/src/obj_rec_ransac_color.cpp
-    )
+#set(SRCS_RANSAC
+#    # ObjRecRANSACColor
+#    recognition/src/obj_rec_ransac_color.cpp
+#    )
 
-set(HEADERS_RANSAC
-    # ObjRecRANSACColor
-    recognition/obj_rec_ransac_color.h
-    )
+#set(HEADERS_RANSAC
+#    # ObjRecRANSACColor
+#    recognition/obj_rec_ransac_color.h
+#    )
 
-set(IMPL_HEADERS_RANSAC
-    )
+#set(IMPL_HEADERS_RANSAC
+#    )
 
 # Add libraries (directories with sources files)
 #add_library(lib_RANSAC ${SRCS_RANSAC} ${HEADERS_RANSAC} ${IMPL_HEADERS_RANSAC})

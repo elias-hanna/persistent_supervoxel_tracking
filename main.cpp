@@ -128,8 +128,8 @@ main( int argc, char** argv )
   while(!viewer->wasStopped ())
   {
     // Get the cloud
-    copyPointCloud(getter.getCloud(), cloud);
-//    copyPointCloud(*clouds[i%N_DATA], cloud);//cloud = clouds[i%N_DATA];
+//    copyPointCloud(getter.getCloud(), cloud);
+    copyPointCloud(*clouds[i%N_DATA], cloud);//cloud = clouds[i%N_DATA];
 
     // If a cloud got captured from the device
     if(!cloud.empty())
@@ -228,6 +228,53 @@ main( int argc, char** argv )
         viewer->addSphere(pt1, 0.005, 0, 255, 0, "start " + std::to_string (line.first));
         viewer->addSphere(pt2, 0.005, 255, 0, 0, "end " + std::to_string (line.first));
       }
+
+      ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+      /////////////////////TEST SIFT//////////////////////
+      ////////////////////////////////////////////////////
+      ////////////////////////////////////////////////////
+
+//      pcl::StopWatch timer;
+//      double begin = timer.getTime ();
+//      // Parameters for sift computation
+//      const float min_scale = 0.01f;
+//      const int n_octaves = 8;
+//      const int n_scales_per_octave = 8;
+//      const float min_contrast = 0.3f;
+
+//      // Copy pointcloud
+//      pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud2 (new pcl::PointCloud<pcl::PointXYZRGBA>);
+//      copyPointCloud(cloud, *cloud2);
+//      // Estimate the sift interest points using Intensity values from RGB values
+//      pcl::SIFTKeypoint<pcl::PointXYZRGBA, pcl::PointWithScale> sift;
+//      pcl::PointCloud<pcl::PointWithScale> result;
+//      pcl::search::KdTree<pcl::PointXYZRGBA>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZRGBA> ());
+//      sift.setSearchMethod(tree);
+//      sift.setScales(min_scale, n_octaves, n_scales_per_octave);
+//      sift.setMinimumContrast(min_contrast);
+//      sift.setInputCloud(cloud2);
+//      sift.compute(result);
+
+//      double end = timer.getTime ();
+
+//      std::cout << "Time elapsed computing sift keypoints: " << end - begin << " ms\n";
+//      // Copying the pointwithscale to pointxyz so as visualize the cloud
+//      pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_temp (new pcl::PointCloud<pcl::PointXYZ>);
+//      copyPointCloud(result, *cloud_temp);
+
+////       Saving the resultant cloud
+//      std::cout << "Resulting sift points are of size: " << cloud_temp->points.size () <<std::endl;
+//      pcl::io::savePCDFileASCII("sift_points.pcd", *cloud_temp);
+
+////       Visualization of keypoints along with the original cloud
+//       pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> keypoints_color_handler (cloud_temp, 0, 255, 0);
+
+//       if (!viewer->updatePointCloud (cloud_temp, keypoints_color_handler, "keypoints"))
+//         viewer->addPointCloud (cloud_temp, keypoints_color_handler, "keypoints");
+
+//       viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 7, "keypoints");
+
       ////////////////////////////////////////////////////
       ////////////////////////////////////////////////////
       ////////////////////////TEST////////////////////////

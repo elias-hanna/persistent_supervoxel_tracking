@@ -602,6 +602,132 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
   ////////////////////////////////////////////////
   ////////////////////////////////////////////////
   ////////////////////////////////////////////////
+  std::vector<uint32_t> labels_to_track;
+  std::unordered_map <uint32_t, pcl::PointCloud<pcl::PointWithScale>> previous_keypoints;
+
+  // Get the labels of the disappeared and fully occluded supervoxels
+  if(getMaxLabel() > 0)
+  {
+    int nb_occluded_voxels_by_labels[getMaxLabel ()] = {0};
+    int nb_voxels_by_labels[getMaxLabel ()] = {0};
+    for(typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
+    {
+      SequentialVoxelData& voxel = (*leaf_itr)->getData ();
+      if(voxel.frame_occluded_ != 0) // It is currently occluded
+      {
+        ++nb_occluded_voxels_by_labels[voxel.label_ - 1];
+      }
+      ++nb_voxels_by_labels[voxel.label_ - 1];
+    }
+    for(auto cluster: supervoxel_clusters)
+    {
+      uint32_t i = cluster.first;
+      // If the sv has disappeared or is fully occluded
+      if(nb_voxels_by_labels[i - 1] == 0 || ( (nb_voxels_by_labels[i - 1] == nb_occluded_voxels_by_labels[i - 1]) && (supervoxel_clusters.find(i) != supervoxel_clusters.end()) ) )
+      { labels_to_track.push_back(i); }
+      //      std::cout << "Label: " << i << " | Occlusion: " << 100 * static_cast<double> (nb_occluded_voxels_by_labels[i - 1]) / nb_voxels_by_labels[i - 1] << " %\n";
+    }
+
+    // Parameters for sift computation
+    const float min_scale = 0.005f;
+    const int n_octaves = 8;
+    const int n_scales_per_octave = 8;
+    const float min_contrast = 0.3f;
+
+    pcl::SIFTKeypoint<PointT, pcl::PointWithScale> sift;
+    pcl::PointCloud<pcl::PointWithScale> result;
+    typename pcl::search::KdTree<PointT>::Ptr tree(new pcl::search::KdTree<PointT> ());
+    sift.setSearchMethod(tree);
+    sift.setScales(min_scale, n_octaves, n_scales_per_octave);
+    sift.setMinimumContrast(min_contrast);
+
+    typename PointCloudT::Ptr voxel_cloud_copy;
+
+    // Get SIFT points from precedent cloud for each label
+    double begin = timer_.getTime ();
+    for(auto label: labels_to_track)
+    {
+      voxel_cloud_copy = boost::make_shared<PointCloudT> ();
+      copyPointCloud(*(supervoxel_clusters[label]->voxels_), *voxel_cloud_copy);
+      // Estimate the sift interest points using Intensity values from RGB values
+
+      sift.setInputCloud(voxel_cloud_copy);
+      sift.compute(result);
+
+      previous_keypoints.insert (std::pair<uint32_t, pcl::PointCloud<pcl::PointWithScale>> (label, result));
+      std::cout << "Label: " << label << " Number of keypoints: " << result.size () <<std::endl;
+    }
+    double end = timer_.getTime ();
+    std::cout << "Time elapsed computing sift keypoints: " << end - begin << " ms\n";
+
+    // Get SIFT points from current cloud
+    voxel_cloud_copy = boost::make_shared<PointCloudT> ();
+    copyPointCloud(*getUnlabeledVoxelNormalCloud (), *voxel_cloud_copy);
+    // Estimate the sift interest points using Intensity values from RGB values
+    sift.setInputCloud(voxel_cloud_copy);
+    sift.compute(result);
+
+    for(auto pair: previous_keypoints)
+    {
+      int label = pair.first;
+      pcl::PointCloud<pcl::PointWithScale> keypoints = pair.second;
+      std::vector<int> indices;
+      indices.reserve (keypoints.size ());
+
+      for(size_t i = 0; i < keypoints.size (); ++i)
+      {
+        indices.push_back (i);
+      }
+
+      int num_max_iter = 100;
+      float bestFit[3] = {0};
+      double bestErr = std::numeric_limits<double>::max ();
+      int min_number_of_inliers = 3;
+      for(size_t i = 0; i < num_max_iter; ++i)
+      {
+        // Deep copy of indices
+        std::vector<int> tmp_indices = indices;
+        // Vector that will store the randomly chosen inliers
+        std::vector<int> maybe_inliers;
+        maybe_inliers.reserve(min_number_of_inliers);
+        // Select min_number_of_inliers values from data (the SIFT keypoints from current frame)
+        for (int j = 0; j < min_number_of_inliers; ++j)
+        {
+          // True random generator
+          std::random_device generator;
+          std::uniform_int_distribution<int> distribution(0, tmp_indices.size () - 1);
+          int rand_indice = distribution (generator);
+          maybe_inliers.push_back (tmp_indices[rand_indice]);
+          tmp_indices.erase(tmp_indices.begin() + rand_indice);
+        }
+        for (auto j: maybe_inliers)
+          std::cout << j << " ";
+        std::cout <<"\n";
+        //        maybeInliers = n randomly selected values from data
+        //        maybeModel = model parameters fitted to maybeInliers
+        //        alsoInliers = empty set
+        //        for every point in data not in maybeInliers {
+        //            if point fits maybeModel with an error smaller than t
+        //                 add point to alsoInliers
+        //        }
+        //        if the number of elements in alsoInliers is > d {
+        //            % this implies that we may have found a good model
+        //            % now test how good it is
+        //            betterModel = model parameters fitted to all points in maybeInliers and alsoInliers
+        //            thisErr = a measure of how well betterModel fits these points
+        //            if thisErr < bestErr {
+        //                bestFit = betterModel
+        //                bestErr = thisErr
+        //            }
+        //        }
+        //        increment iterations
+      }
+      //    return bestFit
+    }
+  }
+  ////////////////////////////////////////////////
+  ////////////////////////////////////////////////
+  ////////////////////////////////////////////////
 
   existing_seed_indices.clear ();
   supervoxel_helpers_.clear ();

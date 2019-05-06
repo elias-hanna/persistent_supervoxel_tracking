@@ -340,11 +340,11 @@ typedef pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBA, Voxe
 typedef pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBL, VoxelDataRGBLT> AdjacencyContainerRGBLT;
 typedef pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBNormal, VoxelDataRGBNT> AdjacencyContainerRGBNT;
 
-template class pcl::SequentialSVClustering<pcl::PointXYZ>;
+//template class pcl::SequentialSVClustering<pcl::PointXYZ>;
 template class pcl::SequentialSVClustering<pcl::PointXYZRGB>;
 template class pcl::SequentialSVClustering<pcl::PointXYZRGBA>;
-template class pcl::SequentialSVClustering<pcl::PointXYZRGBL>;
-template class pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>;
+//template class pcl::SequentialSVClustering<pcl::PointXYZRGBL>;
+//template class pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>;
 
 template class pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZ, VoxelDataT>;
 template class pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGB, VoxelDataRGBT>;
