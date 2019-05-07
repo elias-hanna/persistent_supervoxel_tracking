@@ -46,6 +46,9 @@
 #include <tbb/tbb.h>
 #include <pcl/recognition/ransac_based/obj_rec_ransac.h>
 #include <pcl/keypoints/sift_keypoint.h>
+#include <pcl/features/rift.h>
+#include <pcl/features/intensity_gradient.h>
+#include <pcl/point_types_conversion.h>
 //#include <random>
 //// Turn off the verbose
 //#undef OBJ_REC_RANSAC_VERBOSE
@@ -387,6 +390,10 @@ namespace pcl
       void
       computeVoxelData ();
 
+      /** \brief Compute the voxel data (index of each voxel in the octree and normal of each voxel) */
+      void
+      updatePrevClouds ();
+
       /** \brief This method compute the normal of each leaf belonging to the sequential octree
        */
       void
@@ -449,6 +456,12 @@ namespace pcl
 
       /** \brief Contains the Voxelized centroid Cloud */
       typename PointCloudT::Ptr voxel_centroid_cloud_;
+
+      /** \brief Contains the Voxelized centroid Cloud of the previous frame*/
+      typename PointCloudT::Ptr prev_voxel_centroid_cloud_;
+
+      /** \brief Contains the Normals of the voxel centroid Cloud of the previous frame*/
+      typename NormalCloud::Ptr prev_voxel_centroid_normal_cloud_;
 
       /** \brief Contains the Normals of the input Cloud */
       typename NormalCloud::ConstPtr input_normals_;

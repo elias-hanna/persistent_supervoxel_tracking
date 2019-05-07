@@ -228,6 +228,8 @@ pcl::SequentialSVClustering<PointT>::prepareForSegmentation ()
   if ( input_->points.size () == 0 )
     return (false);
 
+  // Update previous clouds
+  updatePrevClouds ();
   //Add the new cloud of data to the octree
   sequential_octree_->addPointsFromInputCloud ();
   // GlobalCheck unlabels the voxels that changed and update nb_of_unlabeled_voxels_
@@ -240,8 +242,32 @@ pcl::SequentialSVClustering<PointT>::prepareForSegmentation ()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
+pcl::SequentialSVClustering<PointT>::updatePrevClouds ()
+{
+  // Updating the previous voxel centroid cloud and normal cloud
+  if(voxel_centroid_cloud_)
+  {
+    prev_voxel_centroid_cloud_.reset (new PointCloudT);
+    prev_voxel_centroid_cloud_->resize (voxel_centroid_cloud_->size ());
+    prev_voxel_centroid_normal_cloud_.reset (new NormalCloud);
+    prev_voxel_centroid_normal_cloud_->resize (voxel_centroid_cloud_->size ());
+    typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
+    typename PointCloudT::iterator prev_cent_cloud_itr = prev_voxel_centroid_cloud_->begin ();
+    NormalCloud::iterator prev_cent_norm_cloud_itr = prev_voxel_centroid_normal_cloud_->begin ();
+    for (; leaf_itr != sequential_octree_->end (); ++leaf_itr, ++prev_cent_norm_cloud_itr, ++prev_cent_cloud_itr)
+    {
+      SequentialVoxelData& prev_voxel_data = (*leaf_itr)->getData ();
+      prev_voxel_data.getPoint (*prev_cent_cloud_itr);
+      prev_voxel_data.getNormal (*prev_cent_norm_cloud_itr);
+    }
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::computeVoxelData ()
 {
+
   // Updating the unlabeled voxel centroid cloud (used for seeding)
   voxel_centroid_cloud_.reset (new PointCloudT);
   voxel_centroid_cloud_->resize (sequential_octree_->getLeafCount ());
@@ -605,27 +631,25 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
   std::vector<uint32_t> labels_to_track;
   std::unordered_map <uint32_t, pcl::PointCloud<pcl::PointWithScale>> previous_keypoints;
 
-  // Get the labels of the disappeared and fully occluded supervoxels
   if(getMaxLabel() > 0)
   {
+    // Get the labels of the disappeared and fully occluded supervoxels
     int nb_occluded_voxels_by_labels[getMaxLabel ()] = {0};
     int nb_voxels_by_labels[getMaxLabel ()] = {0};
     for(typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
     {
       SequentialVoxelData& voxel = (*leaf_itr)->getData ();
       if(voxel.frame_occluded_ != 0) // It is currently occluded
-      {
-        ++nb_occluded_voxels_by_labels[voxel.label_ - 1];
-      }
+      { ++nb_occluded_voxels_by_labels[voxel.label_ - 1]; }
       ++nb_voxels_by_labels[voxel.label_ - 1];
     }
     for(auto cluster: supervoxel_clusters)
     {
       uint32_t i = cluster.first;
       // If the sv has disappeared or is fully occluded
-      if(nb_voxels_by_labels[i - 1] == 0 || ( (nb_voxels_by_labels[i - 1] == nb_occluded_voxels_by_labels[i - 1]) && (supervoxel_clusters.find(i) != supervoxel_clusters.end()) ) )
+      if(nb_voxels_by_labels[i - 1] == 0 ||
+         ( (nb_voxels_by_labels[i - 1] == nb_occluded_voxels_by_labels[i - 1]) && (supervoxel_clusters.find(i) != supervoxel_clusters.end()) ) )
       { labels_to_track.push_back(i); }
-      //      std::cout << "Label: " << i << " | Occlusion: " << 100 * static_cast<double> (nb_occluded_voxels_by_labels[i - 1]) / nb_voxels_by_labels[i - 1] << " %\n";
     }
 
     // Parameters for sift computation
@@ -635,37 +659,102 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
     const float min_contrast = 0.3f;
 
     pcl::SIFTKeypoint<PointT, pcl::PointWithScale> sift;
-    pcl::PointCloud<pcl::PointWithScale> result;
+    pcl::PointCloud<pcl::PointWithScale> sift_result;
     typename pcl::search::KdTree<PointT>::Ptr tree(new pcl::search::KdTree<PointT> ());
     sift.setSearchMethod(tree);
     sift.setScales(min_scale, n_octaves, n_scales_per_octave);
     sift.setMinimumContrast(min_contrast);
 
-    typename PointCloudT::Ptr voxel_cloud_copy;
+    // Pointclouds
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr xyzrgb_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::PointCloud<pcl::PointXYZI>::Ptr xyzi_total_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+    // Convert previous voxel centroid cloud from XYZRGB/XYZRGBA to XYZI
+    copyPointCloud(*prev_voxel_centroid_cloud_, *xyzrgb_cloud);
+    PointCloudXYZRGBtoXYZI(*xyzrgb_cloud, *xyzi_total_cloud);
 
-    // Get SIFT points from precedent cloud for each label
+    double _1_ = timer_.getTime();
+    // Estimate the Intensity Gradient for this cloud
+    pcl::PointCloud<pcl::IntensityGradient>::Ptr cloud_ig (new pcl::PointCloud<pcl::IntensityGradient>);
+    pcl::IntensityGradientEstimation<pcl::PointXYZI, pcl::Normal, pcl::IntensityGradient> gradient_est;
+    typename pcl::search::KdTree<pcl::PointXYZI>::Ptr treept2 (new pcl::search::KdTree<pcl::PointXYZI> (false));
+    gradient_est.setSearchMethod(treept2);
+    gradient_est.setRadiusSearch(3*resolution_);
+    gradient_est.setInputCloud(xyzi_total_cloud);
+    gradient_est.setInputNormals(prev_voxel_centroid_normal_cloud_);
+    gradient_est.compute(*cloud_ig);
+    double _2_ = timer_.getTime();
+    std::cout << "time gradient estimation: " << _2_ - _1_ <<" ms\n";
+
+    // Get SIFT keypoints and RIFT descriptors for each keypoint from precedent cloud for each label
     double begin = timer_.getTime ();
     for(auto label: labels_to_track)
     {
-      voxel_cloud_copy = boost::make_shared<PointCloudT> ();
-      copyPointCloud(*(supervoxel_clusters[label]->voxels_), *voxel_cloud_copy);
       // Estimate the sift interest points using Intensity values from RGB values
+      sift.setInputCloud(supervoxel_clusters[label]->voxels_);
+      sift.compute(sift_result);
 
-      sift.setInputCloud(voxel_cloud_copy);
-      sift.compute(result);
+      // Get a pointcloud of keypoints in the type PointXYZI (we are just interested in the XYZ position of those points)
+      pcl::PointCloud<pcl::PointXYZI>::Ptr input_keypoints_cloud(new pcl::PointCloud<pcl::PointXYZI>);
+      copyPointCloud(sift_result, *input_keypoints_cloud);
 
-      previous_keypoints.insert (std::pair<uint32_t, pcl::PointCloud<pcl::PointWithScale>> (label, result));
-      std::cout << "Label: " << label << " Number of keypoints: " << result.size () <<std::endl;
+      for(auto point: *input_keypoints_cloud)
+      {
+        std::cout << "x: " << point.x << " y: " << point.y << " z: " << point.z << " I: " << point.intensity << "\n";
+      }
+      // Estimate the RIFT feature
+      pcl::RIFTEstimation<pcl::PointXYZI, pcl::IntensityGradient, pcl::Histogram<32> > rift_est;
+      typename pcl::search::KdTree<pcl::PointXYZI>::Ptr treept3 (new pcl::search::KdTree<pcl::PointXYZI> (false));
+      rift_est.setSearchMethod(treept3);
+      rift_est.setRadiusSearch(seed_resolution_/4.0f);
+      rift_est.setNrDistanceBins (4);
+      rift_est.setNrGradientBins (8);
+      // Compute only RIFT descriptor for SIFT keypoints
+      rift_est.setInputCloud(input_keypoints_cloud);
+      rift_est.setInputGradient(cloud_ig);
+      // Use all the points in the supervoxel cloud to compute the RIFT descriptor
+      rift_est.setSearchSurface(xyzi_total_cloud);
+
+      //      pcl::search::KdTree<pcl::PointXYZ> point_indices_kdtree;
+      //      pcl::PointXYZ pt(sift_result.points[0].x, sift_result.points[0].y, sift_result.points[0].z);
+      //      std::vector<int> indices;
+      //      std::vector<float> sqr_distances;
+
+      //      pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+      //      copyPointCloud(*voxel_cloud_copy, *xyz_cloud);
+      //      point_indices_kdtree.setInputCloud (xyz_cloud);
+      //      point_indices_kdtree.nearestKSearch (pt, 1, indices, sqr_distances);
+      //      int keypoint_indice = indices[0];
+      //      std::cout << "Keypoint indice: " << keypoint_indice << "\n";
+      //      std::cout << "true: x y z " << sift_result.points[0].x << " " << sift_result.points[0].y << " " << sift_result.points[0].z << "\n";
+      //      std::cout << "Test: x y z " << voxel_cloud_copy->points[keypoint_indice].x << " "
+      //                << voxel_cloud_copy->points[keypoint_indice].y << " " << voxel_cloud_copy->points[keypoint_indice].z << "\n";
+
+      //      float radius = 10.0;
+      //      point_indices_kdtree.radiusSearch (pt, radius, indices, sqr_distances);
+      //      std::cout << "Cloud size: " << voxel_cloud_copy->size () << " nb of neigh: " << indices.size () << "\n";
+
+      //      Eigen::MatrixXf rift_descriptor;
+      //      rift_est.computeRIFT (*xyzi_cloud, *cloud_ig, keypoint_indice, radius, indices, sqr_distances, rift_descriptor);
+      pcl::PointCloud<pcl::Histogram<32> > rift_output;
+      rift_est.compute (rift_output);
+
+      std::cout<<" RIFT feature estimated";
+      // Display and retrieve the rift descriptor vector for the first point
+      pcl::Histogram<32> first_descriptor = rift_output.points[1];
+      std::cout << first_descriptor << std::endl;
+
+      previous_keypoints.insert (std::pair<uint32_t, pcl::PointCloud<pcl::PointWithScale>> (label, sift_result));
     }
     double end = timer_.getTime ();
-    std::cout << "Time elapsed computing sift keypoints: " << end - begin << " ms\n";
+    std::cout << "Time elapsed computing sift keypoints and rift descriptors: " << end - begin << " ms\n";
 
-    // Get SIFT points from current cloud
-    voxel_cloud_copy = boost::make_shared<PointCloudT> ();
-    copyPointCloud(*getUnlabeledVoxelNormalCloud (), *voxel_cloud_copy);
-    // Estimate the sift interest points using Intensity values from RGB values
-    sift.setInputCloud(voxel_cloud_copy);
-    sift.compute(result);
+//    // Get SIFT points from current cloud
+//    voxel_cloud_copy = boost::make_shared<PointCloudT> ();
+//    copyPointCloud(*getUnlabeledVoxelNormalCloud (), *voxel_cloud_copy);
+
+//    // Estimate the sift interest points using Intensity values from RGB values
+//    sift.setInputCloud(voxel_cloud_copy);
+//    sift.compute(sift_result);
 
     for(auto pair: previous_keypoints)
     {
@@ -700,9 +789,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
           maybe_inliers.push_back (tmp_indices[rand_indice]);
           tmp_indices.erase(tmp_indices.begin() + rand_indice);
         }
-        for (auto j: maybe_inliers)
-          std::cout << j << " ";
-        std::cout <<"\n";
+
         //        maybeInliers = n randomly selected values from data
         //        maybeModel = model parameters fitted to maybeInliers
         //        alsoInliers = empty set
