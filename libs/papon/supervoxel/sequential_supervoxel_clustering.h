@@ -49,6 +49,7 @@
 #include <pcl/features/rift.h>
 #include <pcl/features/intensity_gradient.h>
 #include <pcl/point_types_conversion.h>
+#include <pcl/filters/extract_indices.h>
 //#include <random>
 //// Turn off the verbose
 //#undef OBJ_REC_RANSAC_VERBOSE
@@ -224,6 +225,12 @@ namespace pcl
       typedef typename pcl::search::KdTree<PointT> KdTreeT;
       typedef boost::shared_ptr<std::vector<int> > IndicesPtr;
 
+      // Keypoints and descriptors types
+      typedef pcl::PointCloud<pcl::PointWithScale> PointCloudScale;
+      typedef pcl::PointCloud<pcl::IntensityGradient> PointCloudIG;
+      typedef pcl::PointCloud<pcl::Histogram<32>> PointCloudHist32;
+      typedef pcl::PointCloud<pcl::PointXYZI> PointCloudI;
+
       using pcl::PCLBase <PointT>::initCompute;
       using pcl::PCLBase <PointT>::deinitCompute;
       using pcl::PCLBase <PointT>::input_;
@@ -360,6 +367,18 @@ namespace pcl
        */
       void
       initializeLabelColors ();
+
+      /** \brief This method computes the RIFT descriptors of the given keypoints
+       * \param[out] A pair containing the indices of the points in the given cloud and their descriptors
+       */
+      std::pair< pcl::IndicesPtr, pcl::PointCloud< pcl::Histogram<32> >::Ptr >
+      computeRIFTDescriptors (const PointCloudScale sift_result, const PointCloudIG::Ptr cloud_ig, const PointCloudI::Ptr xyzi_total_cloud) const;
+
+      /** \brief This method computes the intensity gradient of the given input cloud
+       * \param[out] The Intensity Gradient PointCloud
+       */
+      void
+      computeIntensityGradientCloud (PointCloudIG::Ptr cloud_ig, const PointCloudI::Ptr xyzi_total_cloud, const NormalCloud::Ptr total_normal_cloud) const;
 
       /** \brief Init the computation, update the sequential octree, perform global check to see wether supervoxel have changed
        * more than their half and finally compute the voxel data to be used to determine the supervoxel seeds
