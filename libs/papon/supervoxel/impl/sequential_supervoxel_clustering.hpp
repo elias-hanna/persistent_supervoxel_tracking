@@ -689,18 +689,17 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
     double begin = timer_.getTime ();
     for(auto label: labels_to_track)
     {
+      sift_result.clear ();
       // Estimate the sift interest points using Intensity values from RGB values
       sift.setInputCloud(supervoxel_clusters[label]->voxels_);
       sift.compute(sift_result);
 
       // Get a pointcloud of keypoints in the type PointXYZI (we are just interested in the XYZ position of those points)
-      pcl::PointCloud<pcl::PointXYZI>::Ptr input_keypoints_cloud(new pcl::PointCloud<pcl::PointXYZI>);
-      copyPointCloud(sift_result, *input_keypoints_cloud);
+      pcl::PointCloud<pcl::PointXYZI>::Ptr input_keypoints_cloud_i(new pcl::PointCloud<pcl::PointXYZI>);
+      pcl::PointCloud<pcl::PointXYZRGB>::Ptr input_keypoints_cloud_rgb(new pcl::PointCloud<pcl::PointXYZRGB>);
+      copyPointCloud(sift_result, *input_keypoints_cloud_rgb);
+      PointCloudXYZRGBtoXYZI(*input_keypoints_cloud_rgb, *input_keypoints_cloud_i);
 
-      for(auto point: *input_keypoints_cloud)
-      {
-        std::cout << "x: " << point.x << " y: " << point.y << " z: " << point.z << " I: " << point.intensity << "\n";
-      }
       // Estimate the RIFT feature
       pcl::RIFTEstimation<pcl::PointXYZI, pcl::IntensityGradient, pcl::Histogram<32> > rift_est;
       typename pcl::search::KdTree<pcl::PointXYZI>::Ptr treept3 (new pcl::search::KdTree<pcl::PointXYZI> (false));
@@ -709,52 +708,52 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       rift_est.setNrDistanceBins (4);
       rift_est.setNrGradientBins (8);
       // Compute only RIFT descriptor for SIFT keypoints
-      rift_est.setInputCloud(input_keypoints_cloud);
+      rift_est.setInputCloud(input_keypoints_cloud_i);
       rift_est.setInputGradient(cloud_ig);
       // Use all the points in the supervoxel cloud to compute the RIFT descriptor
       rift_est.setSearchSurface(xyzi_total_cloud);
 
-      //      pcl::search::KdTree<pcl::PointXYZ> point_indices_kdtree;
-      //      pcl::PointXYZ pt(sift_result.points[0].x, sift_result.points[0].y, sift_result.points[0].z);
-      //      std::vector<int> indices;
-      //      std::vector<float> sqr_distances;
+      pcl::IndicesPtr rift_indices = boost::make_shared<std::vector<int>> ();
+      rift_indices->reserve (sift_result.size ());
 
-      //      pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-      //      copyPointCloud(*voxel_cloud_copy, *xyz_cloud);
-      //      point_indices_kdtree.setInputCloud (xyz_cloud);
-      //      point_indices_kdtree.nearestKSearch (pt, 1, indices, sqr_distances);
-      //      int keypoint_indice = indices[0];
-      //      std::cout << "Keypoint indice: " << keypoint_indice << "\n";
-      //      std::cout << "true: x y z " << sift_result.points[0].x << " " << sift_result.points[0].y << " " << sift_result.points[0].z << "\n";
-      //      std::cout << "Test: x y z " << voxel_cloud_copy->points[keypoint_indice].x << " "
-      //                << voxel_cloud_copy->points[keypoint_indice].y << " " << voxel_cloud_copy->points[keypoint_indice].z << "\n";
+      // We only search the indice of each keypoint in the main PointCloud so we are just interested in their XYZ position
+      pcl::search::KdTree<pcl::PointXYZ> point_indices_kdtree(new pcl::search::KdTree<pcl::PointXYZ>);
+      pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cloud(new pcl::PointCloud<pcl::PointXYZ>);
+      copyPointCloud(*prev_voxel_centroid_cloud_, *xyz_cloud);
+      point_indices_kdtree.setInputCloud (xyz_cloud);
+      // Using set temporarly to remove doublons from sift_result method
+      std::set<int> s;
 
-      //      float radius = 10.0;
-      //      point_indices_kdtree.radiusSearch (pt, radius, indices, sqr_distances);
-      //      std::cout << "Cloud size: " << voxel_cloud_copy->size () << " nb of neigh: " << indices.size () << "\n";
+      for(auto point_scale: sift_result)
+      {
+        std::vector<int> indices;
+        std::vector<float> sqr_distances;
 
-      //      Eigen::MatrixXf rift_descriptor;
-      //      rift_est.computeRIFT (*xyzi_cloud, *cloud_ig, keypoint_indice, radius, indices, sqr_distances, rift_descriptor);
+        pcl::PointXYZ pt(point_scale.x, point_scale.y, point_scale.z);
+        point_indices_kdtree.nearestKSearch (pt, 1, indices, sqr_distances);
+        int keypoint_indice = indices[0];
+      // Remove doublons using set
+        s.insert(keypoint_indice);
+      }
+      // Assign set elements to rift indices
+      rift_indices->assign( s.begin(), s.end() );
+
+      rift_est.setIndices(rift_indices);
       pcl::PointCloud<pcl::Histogram<32> > rift_output;
       rift_est.compute (rift_output);
-
-      std::cout<<" RIFT feature estimated";
-      // Display and retrieve the rift descriptor vector for the first point
-      pcl::Histogram<32> first_descriptor = rift_output.points[1];
-      std::cout << first_descriptor << std::endl;
 
       previous_keypoints.insert (std::pair<uint32_t, pcl::PointCloud<pcl::PointWithScale>> (label, sift_result));
     }
     double end = timer_.getTime ();
     std::cout << "Time elapsed computing sift keypoints and rift descriptors: " << end - begin << " ms\n";
 
-//    // Get SIFT points from current cloud
-//    voxel_cloud_copy = boost::make_shared<PointCloudT> ();
-//    copyPointCloud(*getUnlabeledVoxelNormalCloud (), *voxel_cloud_copy);
+    //    // Get SIFT points from current cloud
+    //    voxel_cloud_copy = boost::make_shared<PointCloudT> ();
+    //    copyPointCloud(*getUnlabeledVoxelNormalCloud (), *voxel_cloud_copy);
 
-//    // Estimate the sift interest points using Intensity values from RGB values
-//    sift.setInputCloud(voxel_cloud_copy);
-//    sift.compute(sift_result);
+    //    // Estimate the sift interest points using Intensity values from RGB values
+    //    sift.setInputCloud(voxel_cloud_copy);
+    //    sift.compute(sift_result);
 
     for(auto pair: previous_keypoints)
     {
