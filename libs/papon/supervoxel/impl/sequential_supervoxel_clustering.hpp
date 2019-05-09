@@ -722,7 +722,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       copyPointCloud(*prev_voxel_centroid_cloud_, *xyz_cloud);
       point_indices_kdtree.setInputCloud (xyz_cloud);
       // Using set temporarly to remove doublons from sift_result method
-      std::set<int> s;
+//      std::set<int> s;
 
       for(auto point_scale: sift_result)
       {
@@ -733,10 +733,14 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
         point_indices_kdtree.nearestKSearch (pt, 1, indices, sqr_distances);
         int keypoint_indice = indices[0];
       // Remove doublons using set
-        s.insert(keypoint_indice);
+        rift_indices->push_back(keypoint_indice);
+//        s.insert(keypoint_indice);
+
       }
+      sort( rift_indices->begin(), rift_indices->end() );
+      rift_indices->erase( unique( rift_indices->begin(), rift_indices->end() ), rift_indices->end() );
       // Assign set elements to rift indices
-      rift_indices->assign( s.begin(), s.end() );
+//      rift_indices->assign( s.begin(), s.end() );
 
       rift_est.setIndices(rift_indices);
       pcl::PointCloud<pcl::Histogram<32> > rift_output;
