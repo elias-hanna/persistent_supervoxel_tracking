@@ -629,7 +629,10 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
   ////////////////////////////////////////////////
   ////////////////////////////////////////////////
   std::vector<uint32_t> labels_to_track;
-  std::unordered_map <uint32_t, pcl::PointCloud<pcl::PointWithScale>> previous_keypoints;
+  // previous_keypoints is a map where the key is the label of the concerned supervoxel, and the value is a pair
+  // consisting as first element of the Indices of the keypoints in the previous voxel centroid cloud and as second
+  // element of the RIFT descriptor matching this indice.
+  std::unordered_map< uint32_t, std::pair< pcl::IndicesPtr, pcl::PointCloud< pcl::Histogram<32> > > > previous_keypoints;
 
   if(getMaxLabel() > 0)
   {
@@ -721,8 +724,6 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cloud(new pcl::PointCloud<pcl::PointXYZ>);
       copyPointCloud(*prev_voxel_centroid_cloud_, *xyz_cloud);
       point_indices_kdtree.setInputCloud (xyz_cloud);
-      // Using set temporarly to remove doublons from sift_result method
-//      std::set<int> s;
 
       for(auto point_scale: sift_result)
       {
@@ -732,21 +733,20 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
         pcl::PointXYZ pt(point_scale.x, point_scale.y, point_scale.z);
         point_indices_kdtree.nearestKSearch (pt, 1, indices, sqr_distances);
         int keypoint_indice = indices[0];
-      // Remove doublons using set
         rift_indices->push_back(keypoint_indice);
-//        s.insert(keypoint_indice);
 
       }
+      // Remove doublons
       sort( rift_indices->begin(), rift_indices->end() );
       rift_indices->erase( unique( rift_indices->begin(), rift_indices->end() ), rift_indices->end() );
-      // Assign set elements to rift indices
-//      rift_indices->assign( s.begin(), s.end() );
 
       rift_est.setIndices(rift_indices);
       pcl::PointCloud<pcl::Histogram<32> > rift_output;
       rift_est.compute (rift_output);
 
-      previous_keypoints.insert (std::pair<uint32_t, pcl::PointCloud<pcl::PointWithScale>> (label, sift_result));
+      previous_keypoints.insert (std::pair< uint32_t,
+                                 std::pair< pcl::IndicesPtr, pcl::PointCloud< pcl::Histogram<32> > > >
+                                 (label, std::pair< pcl::IndicesPtr, pcl::PointCloud< pcl::Histogram<32> > > (rift_indices, rift_output) ));
     }
     double end = timer_.getTime ();
     std::cout << "Time elapsed computing sift keypoints and rift descriptors: " << end - begin << " ms\n";
@@ -762,14 +762,8 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
     for(auto pair: previous_keypoints)
     {
       int label = pair.first;
-      pcl::PointCloud<pcl::PointWithScale> keypoints = pair.second;
+      std::vector<int> keypoints_indices(*pair.second.first);
       std::vector<int> indices;
-      indices.reserve (keypoints.size ());
-
-      for(size_t i = 0; i < keypoints.size (); ++i)
-      {
-        indices.push_back (i);
-      }
 
       int num_max_iter = 100;
       float bestFit[3] = {0};
@@ -778,7 +772,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       for(size_t i = 0; i < num_max_iter; ++i)
       {
         // Deep copy of indices
-        std::vector<int> tmp_indices = indices;
+        std::vector<int> tmp_indices = keypoints_indices;
         // Vector that will store the randomly chosen inliers
         std::vector<int> maybe_inliers;
         maybe_inliers.reserve(min_number_of_inliers);
