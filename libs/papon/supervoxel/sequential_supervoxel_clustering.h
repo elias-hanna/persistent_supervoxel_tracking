@@ -50,7 +50,8 @@
 #include <pcl/features/intensity_gradient.h>
 #include <pcl/point_types_conversion.h>
 #include <pcl/filters/extract_indices.h>
-//#include <random>
+#include <pcl/search/flann_search.h>
+//#include <pcl/kdtree/kdtree_flann.h>
 //// Turn off the verbose
 //#undef OBJ_REC_RANSAC_VERBOSE
 
@@ -231,6 +232,15 @@ namespace pcl
       typedef pcl::PointCloud<pcl::Histogram<32>> PointCloudHist32;
       typedef pcl::PointCloud<pcl::PointXYZI> PointCloudI;
 
+      // Feature space searche types
+      typedef pcl::Histogram<32> FeatureT;
+      typedef flann::L2<float> DistanceT;
+      // Search and index types
+      typedef search::FlannSearch<FeatureT, DistanceT> SearchT;
+      typedef typename SearchT::FlannIndexCreatorPtr CreatorPtrT;
+      typedef typename SearchT::KdTreeMultiIndexCreator IndexT;
+      typedef typename SearchT::PointRepresentationPtr RepresentationPtrT;
+
       using pcl::PCLBase <PointT>::initCompute;
       using pcl::PCLBase <PointT>::deinitCompute;
       using pcl::PCLBase <PointT>::input_;
@@ -373,6 +383,13 @@ namespace pcl
        */
       std::pair< pcl::IndicesPtr, pcl::PointCloud< pcl::Histogram<32> >::Ptr >
       computeRIFTDescriptors (const PointCloudScale sift_result, const PointCloudIG::Ptr cloud_ig, const PointCloudI::Ptr xyzi_total_cloud) const;
+
+      /** \brief This method filters out the keypoints where the descriptor don't hold enough information
+       *  \note Should the descriptor always hold good information ? Don't know if it is a metaparameter
+       * problem related to the use of the RIFTEstimation class or if it is normal. */
+
+      void
+      filterKeypoints(const std::pair <pcl::IndicesPtr, PointCloudHist32::Ptr > to_filter_keypoints, std::pair <pcl::IndicesPtr, PointCloudHist32::Ptr >& filtered_keypoints) const;
 
       /** \brief This method computes the intensity gradient of the given input cloud
        * \param[out] The Intensity Gradient PointCloud

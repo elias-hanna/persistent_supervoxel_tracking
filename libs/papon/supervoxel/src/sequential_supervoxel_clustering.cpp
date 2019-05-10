@@ -42,6 +42,11 @@
 #include "../impl/sequential_supervoxel_clustering.hpp"
 #include "../../octree/impl/octree_pointcloud_sequential.hpp"
 
+#include <pcl/search/impl/flann_search.hpp>
+
+// Instantiations of specific point types
+template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::L2<float>>;
+
 /*
  * Do not use pre-compiled versions in this compilation unit (cpp-file),
  * especially for the octree classes. This way the OctreePointCloudAdjacency
