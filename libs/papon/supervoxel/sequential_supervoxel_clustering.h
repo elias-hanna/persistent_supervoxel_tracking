@@ -229,12 +229,12 @@ namespace pcl
       // Keypoints and descriptors types
       typedef pcl::PointCloud<pcl::PointWithScale> PointCloudScale;
       typedef pcl::PointCloud<pcl::IntensityGradient> PointCloudIG;
-      typedef pcl::PointCloud<pcl::Histogram<32>> PointCloudHist32;
       typedef pcl::PointCloud<pcl::PointXYZI> PointCloudI;
 
-      // Feature space searche types
+      // Feature space search types
       typedef pcl::Histogram<32> FeatureT;
       typedef flann::L2<float> DistanceT;
+      typedef pcl::PointCloud<FeatureT> PointCloudFeatureT;
       // Search and index types
       typedef search::FlannSearch<FeatureT, DistanceT> SearchT;
       typedef typename SearchT::FlannIndexCreatorPtr CreatorPtrT;
@@ -389,7 +389,7 @@ namespace pcl
        * problem related to the use of the RIFTEstimation class or if it is normal. */
 
       void
-      filterKeypoints(const std::pair <pcl::IndicesPtr, PointCloudHist32::Ptr > to_filter_keypoints, std::pair <pcl::IndicesPtr, PointCloudHist32::Ptr >& filtered_keypoints) const;
+      filterKeypoints(const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > to_filter_keypoints, std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr >& filtered_keypoints) const;
 
       /** \brief This method computes the intensity gradient of the given input cloud
        * \param[out] The Intensity Gradient PointCloud

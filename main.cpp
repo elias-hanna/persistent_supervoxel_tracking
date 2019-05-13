@@ -235,13 +235,11 @@ main( int argc, char** argv )
       ////////////////////////////////////////////////////
       ////////////////////////////////////////////////////
 
-//      pcl::StopWatch timer;
-//      double begin = timer.getTime ();
-//      // Parameters for sift computation
-//      const float min_scale = 0.01f;
-//      const int n_octaves = 8;
+      // Parameters for sift computation
+//      const float min_scale = 0.005f;
+//      const int n_octaves = 4;
 //      const int n_scales_per_octave = 8;
-//      const float min_contrast = 0.3f;
+//      const float min_contrast = 0.03f;
 
 //      // Copy pointcloud
 //      pcl::PointCloud<pcl::PointXYZRGBA>::Ptr cloud2 (new pcl::PointCloud<pcl::PointXYZRGBA>);
@@ -256,16 +254,9 @@ main( int argc, char** argv )
 //      sift.setInputCloud(cloud2);
 //      sift.compute(result);
 
-//      double end = timer.getTime ();
-
-//      std::cout << "Time elapsed computing sift keypoints: " << end - begin << " ms\n";
 //      // Copying the pointwithscale to pointxyz so as visualize the cloud
 //      pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_temp (new pcl::PointCloud<pcl::PointXYZ>);
 //      copyPointCloud(result, *cloud_temp);
-
-////       Saving the resultant cloud
-//      std::cout << "Resulting sift points are of size: " << cloud_temp->points.size () <<std::endl;
-//      pcl::io::savePCDFileASCII("sift_points.pcd", *cloud_temp);
 
 ////       Visualization of keypoints along with the original cloud
 //       pcl::visualization::PointCloudColorHandlerCustom<pcl::PointXYZ> keypoints_color_handler (cloud_temp, 0, 255, 0);

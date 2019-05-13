@@ -37,16 +37,40 @@
  *
  */
 
+#include <pcl/search/impl/flann_search.hpp>
+#include <pcl/search/impl/search.hpp>
+#include <pcl/point_representation.h>
+
+POINT_CLOUD_REGISTER_POINT_STRUCT (Histogram<32>,
+                                   (float[32], histogram, histogram)
+)
+
+//template class pcl::DefaultFeatureRepresentation<pcl::Histogram<32>>;
+
+// Instantiations of specific point types
+template class pcl::search::Search<pcl::Histogram<32>>;
+template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::L2<float>>;
+
+// Specialization of DefaultPointRepresentation class for Histogram<> class
+//namespace pcl {
+//  template <>
+//  DefaultFeatureRepresentation<Histogram<32>>::DefaultFeatureRepresentation ()
+//  {
+//    nr_dimensions_ = 32;
+//  }
+//  template <>
+//  virtual void
+//  DefaultFeatureRepresentation<Histogram<32>>::copyToFloatArray (const Histogram<32> &p, float * out) const
+//  {
+//    for (int i = 0; i < nr_dimensions_; ++i)
+//      out[i] = p.histogram[i];
+//  }
+//}
+
 #include <pcl/point_types.h>
 #include <pcl/impl/instantiate.hpp>
 #include "../impl/sequential_supervoxel_clustering.hpp"
 #include "../../octree/impl/octree_pointcloud_sequential.hpp"
-
-#include <pcl/search/impl/flann_search.hpp>
-
-// Instantiations of specific point types
-template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::L2<float>>;
-
 /*
  * Do not use pre-compiled versions in this compilation unit (cpp-file),
  * especially for the octree classes. This way the OctreePointCloudAdjacency
@@ -269,8 +293,8 @@ namespace pcl
   pcl::SequentialSVClustering<pcl::PointXYZRGB>::SequentialVoxelData::getPoint (pcl::PointXYZRGB &point_arg) const
   {
     point_arg.rgba = static_cast<uint32_t>(rgb_[0]) << 16 |
-    static_cast<uint32_t>(rgb_[1]) << 8 |
-    static_cast<uint32_t>(rgb_[2]);
+                                                       static_cast<uint32_t>(rgb_[1]) << 8 |
+                                                                                         static_cast<uint32_t>(rgb_[2]);
     point_arg.x = xyz_[0];
     point_arg.y = xyz_[1];
     point_arg.z = xyz_[2];
@@ -281,8 +305,8 @@ namespace pcl
   pcl::SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData::getPoint (pcl::PointXYZRGBA &point_arg ) const
   {
     point_arg.rgba = static_cast<uint32_t>(rgb_[0]) << 16 |
-    static_cast<uint32_t>(rgb_[1]) << 8 |
-    static_cast<uint32_t>(rgb_[2]);
+                                                       static_cast<uint32_t>(rgb_[1]) << 8 |
+                                                                                         static_cast<uint32_t>(rgb_[2]);
     point_arg.x = xyz_[0];
     point_arg.y = xyz_[1];
     point_arg.z = xyz_[2];
@@ -293,8 +317,8 @@ namespace pcl
   pcl::SequentialSVClustering<pcl::PointXYZRGBL>::SequentialVoxelData::getPoint (pcl::PointXYZRGBL &point_arg ) const
   {
     point_arg.rgba = static_cast<uint32_t>(rgb_[0]) << 16 |
-    static_cast<uint32_t>(rgb_[1]) << 8 |
-    static_cast<uint32_t>(rgb_[2]);
+                                                       static_cast<uint32_t>(rgb_[1]) << 8 |
+                                                                                         static_cast<uint32_t>(rgb_[2]);
     point_arg.x = xyz_[0];
     point_arg.y = xyz_[1];
     point_arg.z = xyz_[2];

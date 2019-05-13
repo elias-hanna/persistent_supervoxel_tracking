@@ -642,7 +642,7 @@ pcl::SequentialSVClustering<PointT>::computeRIFTDescriptors (const PointCloudSca
   PointCloudXYZRGBtoXYZI(*input_keypoints_cloud_rgb, *input_keypoints_cloud_i);
 
   // Estimate the RIFT feature
-  pcl::RIFTEstimation<pcl::PointXYZI, pcl::IntensityGradient, pcl::Histogram<32> > rift_est;
+  pcl::RIFTEstimation<pcl::PointXYZI, pcl::IntensityGradient, FeatureT > rift_est;
   typename pcl::search::KdTree<pcl::PointXYZI>::Ptr treept3 (new pcl::search::KdTree<pcl::PointXYZI> (false));
   rift_est.setSearchMethod(treept3);
   rift_est.setRadiusSearch(seed_resolution_/4.0f);
@@ -678,22 +678,22 @@ pcl::SequentialSVClustering<PointT>::computeRIFTDescriptors (const PointCloudSca
   rift_indices->erase( unique( rift_indices->begin(), rift_indices->end() ), rift_indices->end() );
 
   rift_est.setIndices(rift_indices);
-  pcl::PointCloud<pcl::Histogram<32> >::Ptr rift_output(new PointCloudHist32);
+  PointCloudFeatureT::Ptr rift_output(new PointCloudFeatureT);
   rift_est.compute (*rift_output);
 
 
-  return std::pair< pcl::IndicesPtr, PointCloudHist32::Ptr > (rift_indices, rift_output);
+  return std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > (rift_indices, rift_output);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::filterKeypoints(const std::pair <pcl::IndicesPtr, PointCloudHist32::Ptr > to_filter_keypoints, std::pair <pcl::IndicesPtr, PointCloudHist32::Ptr >& filtered_keypoints) const
+pcl::SequentialSVClustering<PointT>::filterKeypoints(const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > to_filter_keypoints, std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr >& filtered_keypoints) const
 {
   for (size_t idx = 0; idx < to_filter_keypoints.second->size (); ++idx)
   {
     bool to_remove = false;
     int nb_of_0s = 0;
-    pcl::Histogram<32> descriptor = (*to_filter_keypoints.second)[idx];
+    FeatureT descriptor = (*to_filter_keypoints.second)[idx];
     // 32 = size of descriptor
     for (int i = 0; i < 32; ++i)
     {
@@ -725,8 +725,8 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
   // previous_keypoints is a map where the key is the label of the concerned supervoxel, and the value is a pair
   // consisting as first element of the Indices of the keypoints in the previous voxel centroid cloud and as second
   // element of the RIFT descriptor matching this indice.
-  std::unordered_map< uint32_t, std::pair< pcl::IndicesPtr, PointCloudHist32::Ptr > > previous_keypoints;
-  std::pair <pcl::IndicesPtr, PointCloudHist32::Ptr > current_keypoints;
+  std::unordered_map< uint32_t, std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > > previous_keypoints;
+  std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > current_keypoints;
 
   if(getMaxLabel() > 0)
   {
@@ -751,9 +751,9 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
 
     // Parameters for sift computation
     const float min_scale = 0.005f;
-    const int n_octaves = 8;
+    const int n_octaves = 4;
     const int n_scales_per_octave = 8;
-    const float min_contrast = 0.3f;
+    const float min_contrast = 0.03f;
 
     pcl::SIFTKeypoint<PointT, pcl::PointWithScale> sift;
     PointCloudScale sift_result;
@@ -784,16 +784,16 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       sift.compute(sift_result);
 
       // Compute the RIFT descriptors
-      std::pair< pcl::IndicesPtr, PointCloudHist32::Ptr > rift_output = computeRIFTDescriptors (sift_result, cloud_ig, xyzi_total_cloud);
+      std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > rift_output = computeRIFTDescriptors (sift_result, cloud_ig, xyzi_total_cloud);
 
       previous_keypoints.insert (std::pair< uint32_t,
-                                 std::pair< pcl::IndicesPtr, PointCloudHist32::Ptr > >
+                                 std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > >
                                  (label, rift_output));
 
       std::cout << "Number of keypoints in supervoxel to track: " << rift_output.first->size () << "\n";
     }
     double out = timer_.getTime ();
-    std::cout << "Time to compute SIFT+RIFT for previousi keypoints: " << out - in << " ms\n";
+    std::cout << "Time to compute SIFT+RIFT for previous keypoints: " << out - in << " ms\n";
     //////////////////////////// NEW POINTS /////////////////////////////
 
     // Pointclouds
@@ -816,27 +816,34 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
     // Compute the RIFT descriptors
     current_keypoints = computeRIFTDescriptors (sift_result, cloud_ig, xyzi_total_cloud);
 
-    std::pair <pcl::IndicesPtr, PointCloudHist32::Ptr > filtered_keypoints(boost::make_shared<std::vector<int>> (), boost::make_shared<PointCloudHist32> ());
+    std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > filtered_keypoints(boost::make_shared<std::vector<int>> (), boost::make_shared<PointCloudFeatureT> ());
 
     filterKeypoints(current_keypoints, filtered_keypoints);
 
     std::vector<int> current_keypoints_indices(*filtered_keypoints.first);
 
+    std::cout << "Number of keypoints in current scene: " << filtered_keypoints.second->size () << "\n";
+    int current_number_of_keypoints = filtered_keypoints.second->size ();
     for(auto pair: previous_keypoints)
     {
       int label = pair.first;
       std::vector<int> previous_keypoints_indices(*pair.second.first);
       std::vector<int> indices;
 
-      int num_max_iter = 100;
+      int min_number_of_inliers = 3;
+      float proba_of_pure_inlier = 0.99f;
+      std::cout << pair.second.second->size ()/static_cast<double>(current_number_of_keypoints) << "\n";
+      int num_max_iter = std::ceil (std::log(1.0 - proba_of_pure_inlier)
+                                    /std::log(1 - std::pow(1 - (1 - pair.second.second->size ()/static_cast<double>(current_number_of_keypoints))
+                                                           , min_number_of_inliers)));
+      std::cout << "Number of iterations required: " << num_max_iter << "\n";
       float bestFit[3] = {0};
       double bestErr = std::numeric_limits<double>::max ();
-      int min_number_of_inliers = 3;
       for(size_t i = 0; i < num_max_iter; ++i)
       {
         // Deep copy of indices
         std::vector<int> tmp_indices = current_keypoints_indices;
-        PointCloudHist32::Ptr tmp_cloud(new PointCloudHist32);
+        PointCloudFeatureT::Ptr tmp_cloud(new PointCloudFeatureT);
         copyPointCloud (*filtered_keypoints.second, *tmp_cloud);
         // Vector that will store the randomly chosen inliers
         std::vector<int> maybe_inliers;
@@ -857,16 +864,29 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
         }
         // Search the nearest previous keypoint in feature space for each of the maybe inliers
         // in order to compute a transform using singular value decomposition
-        // Fill and target with calculated features...
         // Instantiate search object with 4 randomized trees and 256 checks
         SearchT search (true, CreatorPtrT (new IndexT (4)));
-//        search.setPointRepresentation (RepresentationPtrT (new DefaultFeatureRepresentation<FeatureT>));
-//        search.setChecks (256);
-//        search.setInputCloud (maybe_inliers_feature_cloud);
-//        // Do search
-//        std::vector<std::vector<int> > k_indices;
-//        std::vector<std::vector<float> > k_sqr_distances;
-//        search.nearestKSearch (*pair.second.second, std::vector<int> (), 2, k_indices, k_sqr_distances);
+        search.setPointRepresentation (RepresentationPtrT (new DefaultFeatureRepresentation<FeatureT>));
+        search.setChecks (256);
+        search.setInputCloud (pair.second.second);
+        std::vector<int> k_indices;
+        std::vector<float> k_sqr_distances;
+        std::vector<int> matches_of_maybe_inliers;
+        // Do search
+        // Need to handle the fact that some keypoints might disappear (occlusion or not found by algorithm)
+        // Need to handle the fact that some keypoints will "fight" for a match need to do the best attribution
+        for(int idx = 0; idx < maybe_inliers_feature_cloud->size (); ++idx)
+        {
+          //          std::cout << "To be matched:\n" << (*maybe_inliers_feature_cloud)[idx] << "\n";
+          search.nearestKSearch((*maybe_inliers_feature_cloud)[idx], 1, k_indices, k_sqr_distances);
+          //          std::cout << "Match found: " << (*pair.second.second)[k_indices[0]] << "\nWith squared distance = " << k_sqr_distances[0] << "\n";
+          matches_of_maybe_inliers.push_back((*pair.second.first)[k_indices[0]]);
+//          std::cout << "New match between " << maybe_inliers[idx]
+//                       << " (previous cloud) and "
+//                       << matches_of_maybe_inliers[idx]
+//                          << "(current cloud)\nsquared distance: "
+//                          << k_sqr_distances[0] << "\n";
+        }
 
         // Compute the transform between the points sampled from data and the previous keypoints
         boost::shared_ptr< pcl::registration::TransformationEstimation< pcl::PointXYZ, pcl::PointXYZ > > estimator; // Generic container for estimators
