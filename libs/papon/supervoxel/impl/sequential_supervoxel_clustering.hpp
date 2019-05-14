@@ -778,148 +778,220 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
     // Get SIFT keypoints and RIFT descriptors for each keypoint from precedent cloud for each label
     for(auto label: labels_to_track)
     {
-      // Estimate the sift interest points using Intensity values from RGB values
-      sift_result.clear ();
-      sift.setInputCloud(supervoxel_clusters[label]->voxels_);
-      sift.compute(sift_result);
-
-      // Compute the RIFT descriptors
-      std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > rift_output = computeRIFTDescriptors (sift_result, cloud_ig, xyzi_total_cloud);
-
-      previous_keypoints.insert (std::pair< uint32_t,
-                                 std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > >
-                                 (label, rift_output));
-
-      std::cout << "Number of keypoints in supervoxel to track: " << rift_output.first->size () << "\n";
+      if(supervoxel_clusters[label]->voxels_->size () > 20)// Need to get a good metric
+      {
+        // Estimate the sift interest points using Intensity values from RGB values
+        sift_result.clear ();
+        std::cout << "size of the voxel cloud to track: " << supervoxel_clusters[label]->voxels_->size () << "\n";
+        sift.setInputCloud(supervoxel_clusters[label]->voxels_);
+        sift.compute(sift_result);
+        // Compute the RIFT descriptors
+        std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > rift_output = computeRIFTDescriptors (sift_result, cloud_ig, xyzi_total_cloud);
+        if(rift_output.second->size () > 3)// Min number of keypoints in order to track the supervoxel
+        {
+          previous_keypoints.insert (std::pair< uint32_t,
+                                     std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > >
+                                     (label, rift_output));
+          std::cout << "Number of keypoints in supervoxel to track: " << rift_output.first->size () << "\n";
+        }
+      }
     }
     double out = timer_.getTime ();
     std::cout << "Time to compute SIFT+RIFT for previous keypoints: " << out - in << " ms\n";
     //////////////////////////// NEW POINTS /////////////////////////////
-
-    // Pointclouds
-    xyzrgb_cloud.reset (new pcl::PointCloud<pcl::PointXYZRGB>);
-    xyzi_total_cloud.reset (new PointCloudI);
-    // Convert previous voxel centroid cloud from XYZRGB/XYZRGBA to XYZI
-    copyPointCloud (*getUnlabeledVoxelCentroidCloud (), *xyzrgb_cloud);
-    PointCloudXYZRGBtoXYZI (*xyzrgb_cloud, *xyzi_total_cloud);
-
-    // Estimate the Intensity Gradient for this cloud
-    cloud_ig.reset (new PointCloudIG);
-
-    computeIntensityGradientCloud (cloud_ig, xyzi_total_cloud, getUnlabeledVoxelNormalCloud ());
-
-    // Estimate the sift interest points using Intensity values from RGB values
-    sift_result.clear ();
-    sift.setInputCloud(getUnlabeledVoxelCentroidCloud ());
-    sift.compute(sift_result);
-
-    // Compute the RIFT descriptors
-    current_keypoints = computeRIFTDescriptors (sift_result, cloud_ig, xyzi_total_cloud);
-
-    std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > filtered_keypoints(boost::make_shared<std::vector<int>> (), boost::make_shared<PointCloudFeatureT> ());
-
-    filterKeypoints(current_keypoints, filtered_keypoints);
-
-    std::vector<int> current_keypoints_indices(*filtered_keypoints.first);
-
-    std::cout << "Number of keypoints in current scene: " << filtered_keypoints.second->size () << "\n";
-    int current_number_of_keypoints = filtered_keypoints.second->size ();
-    for(auto pair: previous_keypoints)
+    if(previous_keypoints.size () > 0)
     {
-      int label = pair.first;
-      std::vector<int> previous_keypoints_indices(*pair.second.first);
-      std::vector<int> indices;
+      // Pointclouds
+      xyzrgb_cloud.reset (new pcl::PointCloud<pcl::PointXYZRGB>);
+      xyzi_total_cloud.reset (new PointCloudI);
+      // Convert previous voxel centroid cloud from XYZRGB/XYZRGBA to XYZI
+      copyPointCloud (*getUnlabeledVoxelCentroidCloud (), *xyzrgb_cloud);
+      PointCloudXYZRGBtoXYZI (*xyzrgb_cloud, *xyzi_total_cloud);
 
-      int min_number_of_inliers = 3;
-      float proba_of_pure_inlier = 0.99f;
-      std::cout << pair.second.second->size ()/static_cast<double>(current_number_of_keypoints) << "\n";
-      int num_max_iter = std::ceil (std::log(1.0 - proba_of_pure_inlier)
-                                    /std::log(1 - std::pow(1 - (1 - pair.second.second->size ()/static_cast<double>(current_number_of_keypoints))
-                                                           , min_number_of_inliers)));
-      std::cout << "Number of iterations required: " << num_max_iter << "\n";
-      float bestFit[3] = {0};
-      double bestErr = std::numeric_limits<double>::max ();
-      for(size_t i = 0; i < num_max_iter; ++i)
+      // Estimate the Intensity Gradient for this cloud
+      cloud_ig.reset (new PointCloudIG);
+
+      computeIntensityGradientCloud (cloud_ig, xyzi_total_cloud, getUnlabeledVoxelNormalCloud ());
+
+      // Estimate the sift interest points using Intensity values from RGB values
+      sift_result.clear ();
+      sift.setInputCloud(getUnlabeledVoxelCentroidCloud ());
+      sift.compute(sift_result);
+
+      // Compute the RIFT descriptors
+      current_keypoints = computeRIFTDescriptors (sift_result, cloud_ig, xyzi_total_cloud);
+
+      std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > filtered_keypoints(boost::make_shared<std::vector<int>> (), boost::make_shared<PointCloudFeatureT> ());
+
+      filterKeypoints(current_keypoints, filtered_keypoints);
+
+      std::vector<int> current_keypoints_indices(*filtered_keypoints.first);
+
+      std::cout << "Number of keypoints in current scene: " << filtered_keypoints.second->size () << "\n";
+      int current_number_of_keypoints = filtered_keypoints.second->size ();
+      for(auto pair: previous_keypoints)
       {
-        // Deep copy of indices
-        std::vector<int> tmp_indices = current_keypoints_indices;
-        PointCloudFeatureT::Ptr tmp_cloud(new PointCloudFeatureT);
-        copyPointCloud (*filtered_keypoints.second, *tmp_cloud);
-        // Vector that will store the randomly chosen inliers
-        std::vector<int> maybe_inliers;
-        maybe_inliers.reserve (min_number_of_inliers);
-        // Features
-        PointCloud<FeatureT>::Ptr maybe_inliers_feature_cloud(new PointCloud<FeatureT>);
-        // Select min_number_of_inliers values from data (the SIFT keypoints from current frame)
-        for (int j = 0; j < min_number_of_inliers; ++j)
+        int label = pair.first;
+        std::vector<int> previous_keypoints_indices(*pair.second.first);
+        std::vector<int> indices;
+
+        int min_number_of_inliers = 3;
+        float proba_of_pure_inlier = 0.99f;
+        std::cout << pair.second.second->size ()/static_cast<double>(current_number_of_keypoints) << "\n";
+        int num_max_iter = std::ceil (std::log(1.0 - proba_of_pure_inlier)
+                                      /std::log(1 - std::pow(1 - (1 - pair.second.second->size ()/static_cast<double>(current_number_of_keypoints))
+                                                             , min_number_of_inliers)));
+        std::cout << "Number of iterations required: " << num_max_iter << "\n";
+        num_max_iter = 100; // Same as in Van Hoof paper
+        float bestFit[3] = {0};
+        double bestErr = std::numeric_limits<double>::max ();
+        for(size_t i = 0; i < num_max_iter; ++i)
         {
-          // True random generator
-          std::random_device generator;
-          std::uniform_int_distribution<int> distribution(0, tmp_indices.size () - 1);
-          int rand_indice = distribution (generator);
-          maybe_inliers.push_back (tmp_indices[rand_indice]);
-          maybe_inliers_feature_cloud->push_back (tmp_cloud->at(rand_indice));
-          tmp_indices.erase(tmp_indices.begin () + rand_indice);
-          tmp_cloud->erase (tmp_cloud->begin () + rand_indice);
+          // Deep copy of indices
+          std::vector<int> tmp_indices = current_keypoints_indices;
+          PointCloudFeatureT::Ptr tmp_cloud(new PointCloudFeatureT);
+          copyPointCloud (*filtered_keypoints.second, *tmp_cloud);
+          // Vector that will store the randomly chosen inliers
+          std::vector<int> maybe_inliers;
+          maybe_inliers.reserve (min_number_of_inliers);
+          // Features
+          PointCloud<FeatureT>::Ptr maybe_inliers_feature_cloud(new PointCloud<FeatureT>);
+          // Select min_number_of_inliers values from data (the SIFT keypoints from current frame)
+          for (int j = 0; j < min_number_of_inliers; ++j)
+          {
+            // True random generator
+            std::random_device generator;
+            std::uniform_int_distribution<int> distribution(0, tmp_indices.size () - 1);
+            int rand_indice = distribution (generator);
+            maybe_inliers.push_back (tmp_indices[rand_indice]);
+            maybe_inliers_feature_cloud->push_back (tmp_cloud->at(rand_indice));
+            tmp_indices.erase(tmp_indices.begin () + rand_indice);
+            tmp_cloud->erase (tmp_cloud->begin () + rand_indice);
+          }
+          // Search the nearest previous keypoint in feature space for each of the maybe inliers
+          // in order to compute a transform using singular value decomposition
+          // Instantiate search object with 4 randomized trees and 256 checks
+          SearchT search (true, CreatorPtrT (new IndexT (4)));
+          search.setPointRepresentation (RepresentationPtrT (new DefaultFeatureRepresentation<FeatureT>));
+          search.setChecks (256);
+          search.setInputCloud (pair.second.second);
+          std::vector<int> k_indices;
+          std::vector<float> k_sqr_distances;
+          std::vector<int> matches_of_maybe_inliers;//(maybe_inliers.size ());
+          // Do search
+          // Need to handle the fact that some keypoints might disappear (occlusion or not found by algorithm)
+          // Need to handle the fact that some keypoints will "fight" for a match need to do the best attribution
+          //          std::unordered_map<int, std::pair<std::vector<int>, std::vector<float>>> neighbours_of_inliers;
+
+          for(size_t idx = 0; idx < maybe_inliers_feature_cloud->size (); ++idx)
+          {
+            // We look up for k neighbours with k equal to the number of min
+            // inliers
+            size_t k = maybe_inliers_feature_cloud->size ();
+            //          std::cout << "To be matched:\n" << (*maybe_inliers_feature_cloud)[idx] << "\n";
+            search.nearestKSearch((*maybe_inliers_feature_cloud)[idx], static_cast<int> (k), k_indices, k_sqr_distances);
+            //          std::cout << "Match found: " << (*pair.second.second)[k_indices[0]] << "\nWith squared distance = " << k_sqr_distances[0] << "\n";
+            //            neighbours_of_inliers.insert(
+            //                  std::pair<int, std::pair<std::vector<int>, std::vector<float>>>
+            //                  (idx,
+            //                   std::pair<std::vector<int>, std::vector<float>>
+            //                   (k_indices, k_sqr_distances)));
+            for(size_t depth = 0; depth < k; ++depth)
+            {
+              int ind_to_push = (*pair.second.first)[static_cast<size_t> (k_indices[depth])];
+              // If this indice is already matched
+              if(std::find(matches_of_maybe_inliers.begin (), matches_of_maybe_inliers.end (), ind_to_push) != matches_of_maybe_inliers.end ())
+              {
+                continue;
+              }
+              // Else just push it
+              else
+              {
+                matches_of_maybe_inliers.push_back((*pair.second.first)[static_cast<size_t> (k_indices[depth])]);
+                std::cout << "distance: " << k_sqr_distances[depth] << "\n";
+                break;
+              }
+            }
+            //          std::cout << "New match between " << maybe_inliers[idx]
+            //                       << " (previous cloud) and "
+            //                       << matches_of_maybe_inliers[idx]
+            //                          << "(current cloud)\nsquared distance: "
+            //                          << k_sqr_distances[0] << "\n";
+          }
+          // Attribute best neighbour to each potential inlier
+          //          std::vector<int> unmatched_idx(maybe_inliers_feature_cloud->size ());
+          //          std::iota(unmatched_idx.begin (), unmatched_idx.end (), 1);
+          //          for(size_t depth = 0; depth < unmatched_idx.size (); ++depth)
+          //          {
+          //            std::unordered_map<int, std::pair<int, float>> min;
+          //            for(auto idx: unmatched_idx)
+          //            {
+          //              std::unordered_map<int, std::pair<int, float>>::iterator map_it = min.find (neighbours_of_inliers[idx-1].first[depth]);
+          ////              std::cout << neighbours_of_inliers[idx-1].first[depth] << "\n";
+          //              // An other point is competing for this match, compare errors
+          //              if(map_it != min.end ())
+          //              {
+          //                if(map_it->second.second > neighbours_of_inliers[idx-1].second[depth])
+          //                {
+          //                  map_it->second.first = idx-1;
+          //                  map_it->second.second = neighbours_of_inliers[idx-1].second[depth];
+          //                }
+          //              }
+          //              // Otherwise just insert a new element
+          //              else
+          //              {
+          //                min.insert(std::pair<int, std::pair<int, float>>
+          //                           (neighbours_of_inliers[idx-1].first[depth],
+          //                            std::pair<int, float>
+          //                            (idx-1, neighbours_of_inliers[idx-1].second[depth])));
+          //              }
+          //            }
+          //            // Now allocate each match to each point and remove the allocated
+          //            // point index from unmatched index vector
+          //            for(std::unordered_map<int, std::pair<int, float>>::iterator map_it = min.begin (); map_it != min.end (); ++map_it)
+          //            {
+          //              matches_of_maybe_inliers[map_it->second.first] = map_it->first;
+          //              unmatched_idx.erase (std::remove (unmatched_idx.begin (), unmatched_idx.end (), map_it->second.first), unmatched_idx.end ());
+          //            }
+          //          }
+          for(size_t ind = 0; ind < matches_of_maybe_inliers.size (); ++ind)
+            std::cout << "Match between " << maybe_inliers[ind]
+                         << " (previous cloud) and "
+                         << matches_of_maybe_inliers[ind] << " (current cloud)\n";
+          // Compute the transform between the points sampled from data and the previous keypoints
+          boost::shared_ptr< pcl::registration::TransformationEstimation< pcl::PointXYZ, pcl::PointXYZ > > estimator; // Generic container for estimators
+          estimator.reset ( new pcl::registration::TransformationEstimationSVD < pcl::PointXYZ, pcl::PointXYZ > () ); // SVD transform estimator
+          Eigen::Affine3f transformation_est;
+          break;
+          //////IDEE: on prend les maybe inliers, puis on trouve les autres inliers en regardant ceux qui correspondent
+          ///// dans un rayon seed_resolution autour du potentiel centroide
+          ///// ensuite on obtient une mesure basée sur le nombre d'inliers et si on passe un seuil c'est ok !
+
+          //        for (auto idx: maybe_inliers)
+          //          std::cout << idx << " ";
+          //        std::cout << "\n";
+          //        maybeInliers = n randomly selected values from data
+          //        maybeModel = model parameters fitted to maybeInliers
+          //        alsoInliers = empty set
+          //        for every point in data not in maybeInliers {
+          //            if point fits maybeModel with an error smaller than t
+          //                 add point to alsoInliers
+          //        }
+          //        if the number of elements in alsoInliers is > d {
+          //            % this implies that we may have found a good model
+          //            % now test how good it is
+          //            betterModel = model parameters fitted to all points in maybeInliers and alsoInliers
+          //            thisErr = a measure of how well betterModel fits these points
+          //            if thisErr < bestErr {
+          //                bestFit = betterModel
+          //                bestErr = thisErr
+          //            }
+          //        }
+          //        increment iterations
         }
-        // Search the nearest previous keypoint in feature space for each of the maybe inliers
-        // in order to compute a transform using singular value decomposition
-        // Instantiate search object with 4 randomized trees and 256 checks
-        SearchT search (true, CreatorPtrT (new IndexT (4)));
-        search.setPointRepresentation (RepresentationPtrT (new DefaultFeatureRepresentation<FeatureT>));
-        search.setChecks (256);
-        search.setInputCloud (pair.second.second);
-        std::vector<int> k_indices;
-        std::vector<float> k_sqr_distances;
-        std::vector<int> matches_of_maybe_inliers;
-        // Do search
-        // Need to handle the fact that some keypoints might disappear (occlusion or not found by algorithm)
-        // Need to handle the fact that some keypoints will "fight" for a match need to do the best attribution
-        for(int idx = 0; idx < maybe_inliers_feature_cloud->size (); ++idx)
-        {
-          //          std::cout << "To be matched:\n" << (*maybe_inliers_feature_cloud)[idx] << "\n";
-          search.nearestKSearch((*maybe_inliers_feature_cloud)[idx], 1, k_indices, k_sqr_distances);
-          //          std::cout << "Match found: " << (*pair.second.second)[k_indices[0]] << "\nWith squared distance = " << k_sqr_distances[0] << "\n";
-          matches_of_maybe_inliers.push_back((*pair.second.first)[k_indices[0]]);
-//          std::cout << "New match between " << maybe_inliers[idx]
-//                       << " (previous cloud) and "
-//                       << matches_of_maybe_inliers[idx]
-//                          << "(current cloud)\nsquared distance: "
-//                          << k_sqr_distances[0] << "\n";
-        }
-
-        // Compute the transform between the points sampled from data and the previous keypoints
-        boost::shared_ptr< pcl::registration::TransformationEstimation< pcl::PointXYZ, pcl::PointXYZ > > estimator; // Generic container for estimators
-        estimator.reset ( new pcl::registration::TransformationEstimationSVD < pcl::PointXYZ, pcl::PointXYZ > () ); // SVD transform estimator
-        Eigen::Affine3f transformation_est;
-
-        //////IDEE: on prend les maybe inliers, puis on trouve les autres inliers en regardant ceux qui correspondent
-        ///// dans un rayon seed_resolution autour du potentiel centroide
-        ///// ensuite on obtient une mesure basée sur le nombre d'inliers et si on passe un seuil c'est ok !
-
-        //        for (auto idx: maybe_inliers)
-        //          std::cout << idx << " ";
-        //        std::cout << "\n";
-        //        maybeInliers = n randomly selected values from data
-        //        maybeModel = model parameters fitted to maybeInliers
-        //        alsoInliers = empty set
-        //        for every point in data not in maybeInliers {
-        //            if point fits maybeModel with an error smaller than t
-        //                 add point to alsoInliers
-        //        }
-        //        if the number of elements in alsoInliers is > d {
-        //            % this implies that we may have found a good model
-        //            % now test how good it is
-        //            betterModel = model parameters fitted to all points in maybeInliers and alsoInliers
-        //            thisErr = a measure of how well betterModel fits these points
-        //            if thisErr < bestErr {
-        //                bestFit = betterModel
-        //                bestErr = thisErr
-        //            }
-        //        }
-        //        increment iterations
+        break;
+        //    return bestFit
       }
-      //    return bestFit
     }
   }
   ////////////////////////////////////////////////
