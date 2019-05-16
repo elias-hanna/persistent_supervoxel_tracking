@@ -52,6 +52,7 @@
 #include <pcl/filters/extract_indices.h>
 #include <pcl/search/flann_search.h>
 #include <pcl/registration/transformation_validation_euclidean.h>
+#include <pcl/registration/correspondence_estimation.h>
 //#include <pcl/kdtree/kdtree_flann.h>
 //// Turn off the verbose
 //#undef OBJ_REC_RANSAC_VERBOSE

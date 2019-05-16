@@ -832,7 +832,8 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       for(auto pair: previous_keypoints)
       {
         int label = pair.first;
-        std::vector<int> previous_keypoints_indices(*pair.second.first);
+        std::vector<int> previous_keypoints_indices(*(pair.second.first));
+        PointCloudFeatureT previous_keypoints_feature_cloud(*(pair.second.second));
         std::vector<int> indices;
 
         int min_number_of_inliers = 3;
@@ -855,7 +856,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
           std::vector<int> maybe_inliers;
           maybe_inliers.reserve (min_number_of_inliers);
           // Features
-          PointCloud<FeatureT>::Ptr maybe_inliers_feature_cloud(new PointCloud<FeatureT>);
+          PointCloudFeatureT::Ptr maybe_inliers_feature_cloud(new PointCloud<FeatureT>);
           // Select min_number_of_inliers values from data (the SIFT keypoints from current frame)
           for (int j = 0; j < min_number_of_inliers; ++j)
           {
@@ -882,6 +883,8 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
           // Need to handle the fact that some keypoints might disappear (occlusion or not found by algorithm)
           // Need to handle the fact that some keypoints will "fight" for a match need to do the best attribution
           std::unordered_map<int, std::pair<std::vector<int>, std::vector<float>>> neighbours_of_inliers;
+          typename PointCloudFeatureT::Ptr cloud_src(new PointCloudFeatureT), cloud_tgt(new PointCloudFeatureT);
+
           for(size_t idx = 0; idx < maybe_inliers_feature_cloud->size (); ++idx)
           {
             // We look up for k neighbours with k equal to the number of min
@@ -893,6 +896,17 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
                                           std::pair<std::vector<int>, std::vector<float>>
                                           (k_indices, k_sqr_distances))
                                          );
+
+//            cloud_src->push_back ((*getUnlabeledVoxelCentroidCloud ())[maybe_inliers[idx]]);
+//            for(auto neigh_ind: k_indices)
+//            {
+//              cloud_tgt->push_back ((*prev_voxel_centroid_cloud_)[neigh_ind]);
+//            }
+            for(auto neigh_ind: k_indices)
+            {
+              std::vector<int>::iterator indice_it = std::find(pair.second.first->begin (), pair.second.first->end (), neigh_ind);
+              cloud_tgt->push_back ((*pair.second.second)[indice_it - pair.second.first->begin ()]);
+            }
             //            for(size_t depth = 0; depth < k; ++depth)
             //            {
             //              int ind_to_push = (*pair.second.first)[static_cast<size_t> (k_indices[depth])];
@@ -905,7 +919,6 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
             //              }
             //            }
           }
-          /*
           for (int point_idx = 0; point_idx < min_number_of_inliers; ++point_idx)
           {
             std::cout << "-------------------\n" << point_idx << "ieme point:\n";
@@ -917,6 +930,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
               std::cout << "ind: " << indice << " val: " << val << "\n";
             }
           }
+          /*
           // Attribute best neighbour to each potential inlier
           for (int point_idx = 0; point_idx < min_number_of_inliers; ++point_idx)
           {
@@ -975,7 +989,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
             {
               std::unordered_map<int, std::pair<int, float>>::iterator map_it = min.find (neighbours_of_inliers[idx-1].first[depth]);
               //              std::cout << neighbours_of_inliers[idx-1].first[depth] << "\n";
-              // An other point is competing for this match, compare errors
+              // If another point is competing for this match, compare errors
               if(map_it != min.end ())
               {
                 if(map_it->second.second > neighbours_of_inliers[idx-1].second[depth])
@@ -1005,18 +1019,25 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
             std::cout << "Match between " << matches_of_maybe_inliers[idx]
                          << " (previous cloud) and "
                          << maybe_inliers[idx] << " (current cloud)\n";
+
+//          for (size_t idx = 0; idx < maybe_inliers.size (); ++idx)
+//          {
+//            cloud_src.push_back ((*getUnlabeledVoxelCentroidCloud ())[maybe_inliers[idx]]);
+//            for (size_t depth = 0; depth < maybe_inliers.size (); ++idx)
+//            cloud_tgt.push_back ((*prev_voxel_centroid_cloud_)[matches_of_maybe_inliers[idx]]);
+//          }
+
           // Compute the transform between the points sampled from data and the previous keypoints
-          boost::shared_ptr< pcl::registration::TransformationEstimation< PointT, PointT > > estimator; // Generic container for estimators
-          estimator.reset ( new pcl::registration::TransformationEstimationSVD < PointT, PointT > () ); // SVD transform estimator
-          Eigen::Matrix<float, 4, 4> transformation_est;
-          PointCloudT cloud_src, cloud_tgt;
-          for (size_t idx = 0; idx < matches_of_maybe_inliers.size (); ++idx)
-          {
-            cloud_src.push_back ((*prev_voxel_centroid_cloud_)[matches_of_maybe_inliers[idx]]);
-            cloud_tgt.push_back ((*getUnlabeledVoxelCentroidCloud ())[maybe_inliers[idx]]);
-          }
-          estimator->estimateRigidTransformation (cloud_src, cloud_tgt, transformation_est);
-          std::cout << transformation_est << "\n";
+//          boost::shared_ptr< pcl::registration::TransformationEstimation< PointT, PointT > > estimator; // Generic container for estimators
+//          estimator.reset ( new pcl::registration::TransformationEstimationSVD < PointT, PointT > () ); // SVD transform estimator
+//          Eigen::Matrix<float, 4, 4> transformation_est;
+////          for (size_t idx = 0; idx < matches_of_maybe_inliers.size (); ++idx)
+////          {
+////            cloud_src.push_back ((*prev_voxel_centroid_cloud_)[matches_of_maybe_inliers[idx]]);
+////            cloud_tgt.push_back ((*getUnlabeledVoxelCentroidCloud ())[maybe_inliers[idx]]);
+////          }
+//          estimator->estimateRigidTransformation (cloud_src, cloud_tgt, transformation_est);
+//          std::cout << transformation_est << "\n";
           // Do radius search around new estimated centroid
 
           // For each keypoint in this radius, check if it could match
