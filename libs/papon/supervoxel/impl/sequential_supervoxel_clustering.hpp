@@ -782,7 +782,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       {
         // Estimate the sift interest points using Intensity values from RGB values
         sift_result.clear ();
-        std::cout << "size of the voxel cloud to track: " << supervoxel_clusters[label]->voxels_->size () << "\n";
+        //        std::cout << "size of the voxel cloud to track: " << supervoxel_clusters[label]->voxels_->size () << "\n";
         sift.setInputCloud(supervoxel_clusters[label]->voxels_);
         sift.compute(sift_result);
         // Compute the RIFT descriptors
@@ -792,7 +792,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
           previous_keypoints.insert (std::pair< uint32_t,
                                      std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > >
                                      (label, rift_output));
-          std::cout << "Number of keypoints in supervoxel to track: " << rift_output.first->size () << "\n";
+          //          std::cout << "Number of keypoints in supervoxel to track: " << rift_output.first->size () << "\n";
         }
       }
     }
@@ -881,87 +881,155 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
           // Do search
           // Need to handle the fact that some keypoints might disappear (occlusion or not found by algorithm)
           // Need to handle the fact that some keypoints will "fight" for a match need to do the best attribution
-          //          std::unordered_map<int, std::pair<std::vector<int>, std::vector<float>>> neighbours_of_inliers;
-
+          std::unordered_map<int, std::pair<std::vector<int>, std::vector<float>>> neighbours_of_inliers;
           for(size_t idx = 0; idx < maybe_inliers_feature_cloud->size (); ++idx)
           {
             // We look up for k neighbours with k equal to the number of min
             // inliers
             size_t k = maybe_inliers_feature_cloud->size ();
-            //          std::cout << "To be matched:\n" << (*maybe_inliers_feature_cloud)[idx] << "\n";
             search.nearestKSearch((*maybe_inliers_feature_cloud)[idx], static_cast<int> (k), k_indices, k_sqr_distances);
-            //          std::cout << "Match found: " << (*pair.second.second)[k_indices[0]] << "\nWith squared distance = " << k_sqr_distances[0] << "\n";
-            //            neighbours_of_inliers.insert(
-            //                  std::pair<int, std::pair<std::vector<int>, std::vector<float>>>
-            //                  (idx,
-            //                   std::pair<std::vector<int>, std::vector<float>>
-            //                   (k_indices, k_sqr_distances)));
-            for(size_t depth = 0; depth < k; ++depth)
+            neighbours_of_inliers.insert(std::pair<int, std::pair<std::vector<int>, std::vector<float>>>
+                                         (idx,
+                                          std::pair<std::vector<int>, std::vector<float>>
+                                          (k_indices, k_sqr_distances))
+                                         );
+            //            for(size_t depth = 0; depth < k; ++depth)
+            //            {
+            //              int ind_to_push = (*pair.second.first)[static_cast<size_t> (k_indices[depth])];
+            //              // If this indice isn't already matched
+            //              if(std::find(matches_of_maybe_inliers.begin (), matches_of_maybe_inliers.end (), ind_to_push) == matches_of_maybe_inliers.end ())
+            //              {
+            //                matches_of_maybe_inliers.push_back((*pair.second.first)[static_cast<size_t> (k_indices[depth])]);
+            //                std::cout << "distance: " << k_sqr_distances[depth] << "\n";
+            //                break;
+            //              }
+            //            }
+          }
+          /*
+          for (int point_idx = 0; point_idx < min_number_of_inliers; ++point_idx)
+          {
+            std::cout << "-------------------\n" << point_idx << "ieme point:\n";
+            for (int neigh_idx = 0; neigh_idx < min_number_of_inliers; ++neigh_idx)
             {
-              int ind_to_push = (*pair.second.first)[static_cast<size_t> (k_indices[depth])];
-              // If this indice is already matched
-              if(std::find(matches_of_maybe_inliers.begin (), matches_of_maybe_inliers.end (), ind_to_push) != matches_of_maybe_inliers.end ())
+              float val = (neighbours_of_inliers[point_idx]).second[neigh_idx];
+              // Indice in pointcloud of previous keypoints
+              int indice = (neighbours_of_inliers[point_idx]).first[neigh_idx];
+              std::cout << "ind: " << indice << " val: " << val << "\n";
+            }
+          }
+          // Attribute best neighbour to each potential inlier
+          for (int point_idx = 0; point_idx < min_number_of_inliers; ++point_idx)
+          {
+            std::cout << "-------------------\n" << point_idx << "ieme point:\n";
+            for (int neigh_idx = 0; neigh_idx < min_number_of_inliers; ++neigh_idx)
+            {
+              bool matched = true;
+              float min = (neighbours_of_inliers[point_idx]).second[neigh_idx];
+              // Indice in pointcloud of previous keypoints
+              int indice = (neighbours_of_inliers[point_idx]).first[neigh_idx];
+              // Iterator used to assure that this indice is not already attributed
+              std::vector<int>::iterator test_it = std::find (matches_of_maybe_inliers.begin (), matches_of_maybe_inliers.end (),
+                                                              (*pair.second.first)[indice]);
+              if(test_it == matches_of_maybe_inliers.end ())
               {
-                continue;
+                for (int compare_idx = 0; compare_idx < min_number_of_inliers; ++compare_idx)
+                {
+                  if (compare_idx != point_idx)
+                  {
+                    // Check if same indice exist in this concurrent point
+                    std::vector<int> comp_neigh_ind = neighbours_of_inliers[compare_idx].first;
+                    std::vector<int>::iterator comp_it = std::find (comp_neigh_ind.begin (), comp_neigh_ind.end (), indice);
+                    std::cout << indice << " " << *comp_it << "\n";
+
+                    if (comp_it != comp_neigh_ind.end ())
+                    {
+                      // Check if this point is better than the current one to fit the point
+                      std::vector<float> comp_neigh_dist = neighbours_of_inliers[compare_idx].second;
+                      std::cout << "val: " << comp_neigh_dist[comp_it - comp_neigh_ind.begin ()] << "\n";
+                      if (min > comp_neigh_dist[comp_it - comp_neigh_ind.begin ()])
+                      {
+                        std::cout << "This one is better\n";
+                        matched = false;
+                        break;
+                      }
+                    }
+                  }
+                }
               }
-              // Else just push it
-              else
+              // If this neighbour is the best attribution for this point
+              // push its index (in previous pointcloud)
+              if (matched)
               {
-                matches_of_maybe_inliers.push_back((*pair.second.first)[static_cast<size_t> (k_indices[depth])]);
-                std::cout << "distance: " << k_sqr_distances[depth] << "\n";
+                matches_of_maybe_inliers.push_back((*pair.second.first)[indice]);
                 break;
               }
             }
-            //          std::cout << "New match between " << maybe_inliers[idx]
-            //                       << " (previous cloud) and "
-            //                       << matches_of_maybe_inliers[idx]
-            //                          << "(current cloud)\nsquared distance: "
-            //                          << k_sqr_distances[0] << "\n";
           }
-          // Attribute best neighbour to each potential inlier
-          //          std::vector<int> unmatched_idx(maybe_inliers_feature_cloud->size ());
-          //          std::iota(unmatched_idx.begin (), unmatched_idx.end (), 1);
-          //          for(size_t depth = 0; depth < unmatched_idx.size (); ++depth)
-          //          {
-          //            std::unordered_map<int, std::pair<int, float>> min;
-          //            for(auto idx: unmatched_idx)
-          //            {
-          //              std::unordered_map<int, std::pair<int, float>>::iterator map_it = min.find (neighbours_of_inliers[idx-1].first[depth]);
-          ////              std::cout << neighbours_of_inliers[idx-1].first[depth] << "\n";
-          //              // An other point is competing for this match, compare errors
-          //              if(map_it != min.end ())
-          //              {
-          //                if(map_it->second.second > neighbours_of_inliers[idx-1].second[depth])
-          //                {
-          //                  map_it->second.first = idx-1;
-          //                  map_it->second.second = neighbours_of_inliers[idx-1].second[depth];
-          //                }
-          //              }
-          //              // Otherwise just insert a new element
-          //              else
-          //              {
-          //                min.insert(std::pair<int, std::pair<int, float>>
-          //                           (neighbours_of_inliers[idx-1].first[depth],
-          //                            std::pair<int, float>
-          //                            (idx-1, neighbours_of_inliers[idx-1].second[depth])));
-          //              }
-          //            }
-          //            // Now allocate each match to each point and remove the allocated
-          //            // point index from unmatched index vector
-          //            for(std::unordered_map<int, std::pair<int, float>>::iterator map_it = min.begin (); map_it != min.end (); ++map_it)
-          //            {
-          //              matches_of_maybe_inliers[map_it->second.first] = map_it->first;
-          //              unmatched_idx.erase (std::remove (unmatched_idx.begin (), unmatched_idx.end (), map_it->second.first), unmatched_idx.end ());
-          //            }
-          //          }
-          for(size_t ind = 0; ind < matches_of_maybe_inliers.size (); ++ind)
-            std::cout << "Match between " << maybe_inliers[ind]
+          */
+          std::vector<int> unmatched_idx(maybe_inliers_feature_cloud->size ());
+          std::iota(unmatched_idx.begin (), unmatched_idx.end (), 1);
+          for(size_t depth = 0; depth < unmatched_idx.size (); ++depth)
+          {
+            std::unordered_map<int, std::pair<int, float>> min;
+            for(auto idx: unmatched_idx)
+            {
+              std::unordered_map<int, std::pair<int, float>>::iterator map_it = min.find (neighbours_of_inliers[idx-1].first[depth]);
+              //              std::cout << neighbours_of_inliers[idx-1].first[depth] << "\n";
+              // An other point is competing for this match, compare errors
+              if(map_it != min.end ())
+              {
+                if(map_it->second.second > neighbours_of_inliers[idx-1].second[depth])
+                {
+                  map_it->second.first = idx-1;
+                  map_it->second.second = neighbours_of_inliers[idx-1].second[depth];
+                }
+              }
+              // Otherwise just insert a new element
+              else
+              {
+                min.insert(std::pair<int, std::pair<int, float>>
+                           (neighbours_of_inliers[idx-1].first[depth],
+                           std::pair<int, float>
+                           (idx-1, neighbours_of_inliers[idx-1].second[depth])));
+              }
+            }
+            // Now allocate each match to each point and remove the allocated
+            // point index from unmatched index vector
+            for(std::unordered_map<int, std::pair<int, float>>::iterator map_it = min.begin (); map_it != min.end (); ++map_it)
+            {
+              matches_of_maybe_inliers[map_it->second.first] = map_it->first;
+              unmatched_idx.erase (std::remove (unmatched_idx.begin (), unmatched_idx.end (), map_it->second.first), unmatched_idx.end ());
+            }
+          }
+          for(size_t idx = 0; idx < matches_of_maybe_inliers.size (); ++idx)
+            std::cout << "Match between " << matches_of_maybe_inliers[idx]
                          << " (previous cloud) and "
-                         << matches_of_maybe_inliers[ind] << " (current cloud)\n";
+                         << maybe_inliers[idx] << " (current cloud)\n";
           // Compute the transform between the points sampled from data and the previous keypoints
-          boost::shared_ptr< pcl::registration::TransformationEstimation< pcl::PointXYZ, pcl::PointXYZ > > estimator; // Generic container for estimators
-          estimator.reset ( new pcl::registration::TransformationEstimationSVD < pcl::PointXYZ, pcl::PointXYZ > () ); // SVD transform estimator
-          Eigen::Affine3f transformation_est;
+          boost::shared_ptr< pcl::registration::TransformationEstimation< PointT, PointT > > estimator; // Generic container for estimators
+          estimator.reset ( new pcl::registration::TransformationEstimationSVD < PointT, PointT > () ); // SVD transform estimator
+          Eigen::Matrix<float, 4, 4> transformation_est;
+          PointCloudT cloud_src, cloud_tgt;
+          for (size_t idx = 0; idx < matches_of_maybe_inliers.size (); ++idx)
+          {
+            cloud_src.push_back ((*prev_voxel_centroid_cloud_)[matches_of_maybe_inliers[idx]]);
+            cloud_tgt.push_back ((*getUnlabeledVoxelCentroidCloud ())[maybe_inliers[idx]]);
+          }
+          estimator->estimateRigidTransformation (cloud_src, cloud_tgt, transformation_est);
+          std::cout << transformation_est << "\n";
+          // Do radius search around new estimated centroid
+
+          // For each keypoint in this radius, check if it could match
+          // at least one keypoint of the previous supervoxel
+          // if so, add it as an inlier
+          // OR
+          // (This need a GOOD transform)
+          // Transform each point of supervoxel
+          // Get NN distance, if below threshold add as inlier
+          // OR
+          // Use TransformationValidationEuclidean class to get
+          // the L2 squared norm between src and tgt cloud
+          // pcl::registration::TransformationValidationEuclidean<FeatureT, FeatureT, float> validator;
           break;
           //////IDEE: on prend les maybe inliers, puis on trouve les autres inliers en regardant ceux qui correspondent
           ///// dans un rayon seed_resolution autour du potentiel centroide
