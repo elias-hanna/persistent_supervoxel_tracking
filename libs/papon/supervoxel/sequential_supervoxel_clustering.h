@@ -384,20 +384,32 @@ namespace pcl
        * \param[out] A pair containing the indices of the points in the given cloud and their descriptors
        */
       std::pair< pcl::IndicesPtr, pcl::PointCloud< pcl::Histogram<32> >::Ptr >
-      computeRIFTDescriptors (const PointCloudScale sift_result, const PointCloudIG::Ptr cloud_ig, const PointCloudI::Ptr xyzi_total_cloud) const;
+      computeRIFTDescriptors (const PointCloudScale sift_result, const PointCloudIG::Ptr cloud_ig,
+                              const PointCloudI::Ptr xyzi_total_cloud) const;
 
       /** \brief This method filters out the keypoints where the descriptor don't hold enough information
        *  \note Should the descriptor always hold good information ? Don't know if it is a metaparameter
        * problem related to the use of the RIFTEstimation class or if it is normal. */
-
       void
-      filterKeypoints(const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > to_filter_keypoints, std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr >& filtered_keypoints) const;
+      filterKeypoints(const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > to_filter_keypoints,
+                      std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr >& filtered_keypoints) const;
+
+      /** \brief This method compute key points matches between an input vector
+       * of potential inliers and points in an input pointcloud
+       * \note This method set priority over order of preference rather than distance
+       * between point and potential match
+       * \param[out] The vector of point indices that match the input indices, out[i]=-1 if no
+       * matching point was found */
+      std::vector<int>
+      computeKeypointsMatches(const std::vector<int> to_match_indices, const PointCloudFeatureT to_match_feature_cloud,
+                              const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > indices_point_pair);
 
       /** \brief This method computes the intensity gradient of the given input cloud
        * \param[out] The Intensity Gradient PointCloud
        */
       void
-      computeIntensityGradientCloud (PointCloudIG::Ptr cloud_ig, const PointCloudI::Ptr xyzi_total_cloud, const NormalCloud::Ptr total_normal_cloud) const;
+      computeIntensityGradientCloud (PointCloudIG::Ptr cloud_ig, const PointCloudI::Ptr xyzi_total_cloud,
+                                     const NormalCloud::Ptr total_normal_cloud) const;
 
       /** \brief Init the computation, update the sequential octree, perform global check to see wether supervoxel have changed
        * more than their half and finally compute the voxel data to be used to determine the supervoxel seeds
