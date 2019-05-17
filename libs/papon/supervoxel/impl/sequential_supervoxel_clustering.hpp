@@ -995,8 +995,9 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
           copyPointCloud(*getUnlabeledVoxelCentroidCloud (), *xyz_cloud);
           unlabeled_voxel_cloud_search->setInputCloud (xyz_cloud);
           unlabeled_voxel_cloud_search->radiusSearch (pt, seed_resolution_, k_indices, k_sqr_distances);
+          std::cout << "number of potential inliers: " << k_indices.size () <<"\n";
           // Find the current keypoints that are in this potential supervoxel
-          float threshold = 0.5f;
+          float threshold = 0.1f;
           // Search the nearest previous keypoint in feature space for each of the maybe inliers
           // in order to compute a transform using singular value decomposition
           // Instantiate search object with 4 randomized trees and 256 checks
