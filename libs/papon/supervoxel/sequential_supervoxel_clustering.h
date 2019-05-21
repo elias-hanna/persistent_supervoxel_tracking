@@ -53,6 +53,7 @@
 #include <pcl/search/flann_search.h>
 #include <pcl/registration/transformation_validation_euclidean.h>
 #include <pcl/registration/correspondence_estimation.h>
+#include <pcl/filters/statistical_outlier_removal.h>
 //#include <pcl/kdtree/kdtree_flann.h>
 //// Turn off the verbose
 //#undef OBJ_REC_RANSAC_VERBOSE
@@ -111,10 +112,13 @@ namespace pcl
       class SequentialSupervoxelHelper;
       friend class SequentialSupervoxelHelper;
     public:
-      std::unordered_map<uint32_t, std::pair<Eigen::Vector3f, Eigen::Vector3f>> lines_;
+      std::unordered_map<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>> lines_;
+      std::vector<int> previous_keypoints_indices_;
+      std::vector<int> current_keypoints_indices_;
 
       std::vector<uint32_t>
       getLabelColors ();
+
       /** \brief VoxelData is a structure used for storing data within a pcl::octree::OctreePointCloudAdjacencyContainer
        *  \note It stores xyz, rgb, normal, distance, an index, and an owner.
        */
@@ -237,6 +241,7 @@ namespace pcl
       typedef pcl::Histogram<32> FeatureT;
       typedef flann::L2<float> DistanceT;
       typedef pcl::PointCloud<FeatureT> PointCloudFeatureT;
+
       // Search and index types
       typedef search::FlannSearch<FeatureT, DistanceT> SearchT;
       typedef typename SearchT::FlannIndexCreatorPtr CreatorPtrT;
@@ -354,6 +359,10 @@ namespace pcl
       /** \brief Returns a deep copy of the voxel centroid cloud */
       typename pcl::PointCloud<PointT>::Ptr
       getVoxelCentroidCloud () const;
+
+      /** \brief Returns a deep copy of the previous voxel centroid cloud */
+      typename pcl::PointCloud<PointT>::Ptr
+      getPrevVoxelCentroidCloud () const;
 
       /** \brief Returns a deep copy of the voxel centroid cloud */
       typename pcl::PointCloud<PointT>::Ptr
