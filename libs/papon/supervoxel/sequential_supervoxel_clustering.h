@@ -419,6 +419,12 @@ namespace pcl
       void
       computeIntensityGradientCloud (PointCloudIG::Ptr cloud_ig, const PointCloudI::Ptr xyzi_total_cloud,
                                      const NormalCloud::Ptr total_normal_cloud) const;
+      /** \brief This method computes the intensity gradient cloud and the intensity cloud
+       * that are required by the SIFT algorithm to compute keypoints
+       */
+      void
+      computeSIFTRequiredClouds (PointCloudIG::Ptr cloud_ig, PointCloudI::Ptr xyzi_total_cloud,
+                                 typename PointCloudT::Ptr cloud, NormalCloud::Ptr normal_cloud);
 
       /** \brief Init the computation, update the sequential octree, perform global check to see wether supervoxel have changed
        * more than their half and finally compute the voxel data to be used to determine the supervoxel seeds
@@ -438,12 +444,25 @@ namespace pcl
       void
       globalCheck ();
 
+      /** \brief This method computes the label of the occluded/disappeared supervoxels
+       * and returns a vector of those labels
+       * \param[out] Vector of labels (uint32_t) */
+      std::vector<uint32_t>
+      getLabelsOfDynamicSV (SequentialSVMapT &supervoxel_clusters);
+
       /** \brief This method uses a RANSAC based algorithm to find matches to disappeared/occluded supervoxels from previous
        * frame that woud appear in the current frame
        * \param[out] matches found in the form of an STL unordered map with label as key and pcl::recognition::ObjRecRANSAC::Output as value
        */
       std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output>
       getMatches (SequentialSVMapT supervoxel_clusters);
+
+      /** \brief This method uses a RANSAC based algorithm to find matches to disappeared/occluded supervoxels from previous
+       * frame that woud appear in the current frame
+       * \param[out] matches found in the form of an STL unordered map with label as key and pcl::recognition::ObjRecRANSAC::Output as value
+       */
+      std::unordered_map<int, Eigen::Matrix<float, 4, 4>>
+      getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters);
 
       /** \brief Compute the voxel data (index of each voxel in the octree and normal of each voxel) */
       void

@@ -488,31 +488,12 @@ pcl::SequentialSVClustering<PointT>::globalCheck()
 template <typename PointT> std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output>
 pcl::SequentialSVClustering<PointT>::getMatches (SequentialSVMapT supervoxel_clusters)
 {
-  std::vector<uint32_t> labels_to_track;
   std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output> valid_outputs;
 
   // Get the labels of the disappeared and fully occluded supervoxels
   if(getMaxLabel() > 0)
   {
-    int nb_occluded_voxels_by_labels[getMaxLabel ()] = {0};
-    int nb_voxels_by_labels[getMaxLabel ()] = {0};
-    for(typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
-    {
-      SequentialVoxelData& voxel = (*leaf_itr)->getData ();
-      if(voxel.frame_occluded_ != 0) // It is currently occluded
-      {
-        ++nb_occluded_voxels_by_labels[voxel.label_ - 1];
-      }
-      ++nb_voxels_by_labels[voxel.label_ - 1];
-    }
-    for(auto cluster: supervoxel_clusters)
-    {
-      uint32_t i = cluster.first;
-      // If the sv has disappeared or is fully occluded
-      if(nb_voxels_by_labels[i - 1] == 0 || ( (nb_voxels_by_labels[i - 1] == nb_occluded_voxels_by_labels[i - 1]) && (supervoxel_clusters.find(i) != supervoxel_clusters.end()) ) )
-      { labels_to_track.push_back(i); }
-      //      std::cout << "Label: " << i << " | Occlusion: " << 100 * static_cast<double> (nb_occluded_voxels_by_labels[i - 1]) / nb_voxels_by_labels[i - 1] << " %\n";
-    }
+    std::vector<uint32_t> labels_to_track = getLabelsOfDynamicSV (supervoxel_clusters);
 
     // Try to find the disappeared / occluded supervoxels in the new voxel cloud
     pcl::recognition::ObjRecRANSAC tracker_ransac(seed_resolution_*0.5, resolution_);
@@ -645,7 +626,7 @@ pcl::SequentialSVClustering<PointT>::computeRIFTDescriptors (const PointCloudSca
   pcl::RIFTEstimation<pcl::PointXYZI, pcl::IntensityGradient, FeatureT > rift_est;
   typename pcl::search::KdTree<pcl::PointXYZI>::Ptr treept3 (new pcl::search::KdTree<pcl::PointXYZI> (false));
   rift_est.setSearchMethod(treept3);
-  rift_est.setRadiusSearch(seed_resolution_/4.0f);
+  rift_est.setRadiusSearch(seed_resolution_);
   rift_est.setNrDistanceBins (4);
   rift_est.setNrGradientBins (8);
   // Compute only RIFT descriptor for SIFT keypoints
@@ -788,48 +769,77 @@ pcl::SequentialSVClustering<PointT>::computeKeypointsMatches(const std::vector<i
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &supervoxel_clusters, std::vector<int>& existing_seed_indices)
+template <typename PointT> std::vector<uint32_t>
+pcl::SequentialSVClustering<PointT>::getLabelsOfDynamicSV (SequentialSVMapT &supervoxel_clusters)
 {
-  std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output> matches;// = getMatches(supervoxel_clusters);
-  lines_.clear ();
-  ////////////////////////////////////////////////
-  ////////////////////////////////////////////////
-  ////////////////////////////////////////////////
   std::vector<uint32_t> labels_to_track;
+  // Get the labels of the disappeared and fully occluded supervoxels
+  int nb_occluded_voxels_by_labels[getMaxLabel ()] = {0};
+  int nb_voxels_by_labels[getMaxLabel ()] = {0};
+  for(typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
+  {
+    SequentialVoxelData& voxel = (*leaf_itr)->getData ();
+    if(voxel.frame_occluded_ != 0) // It is currently occluded
+    { ++nb_occluded_voxels_by_labels[voxel.label_ - 1]; }
+    ++nb_voxels_by_labels[voxel.label_ - 1];
+  }
+  for(auto cluster: supervoxel_clusters)
+  {
+    uint32_t i = cluster.first;
+    // If the sv has disappeared or is fully occluded
+    if(nb_voxels_by_labels[i - 1] == 0 ||
+       ( (nb_voxels_by_labels[i - 1] == nb_occluded_voxels_by_labels[i - 1]) && (supervoxel_clusters.find(i) != supervoxel_clusters.end()) ) )
+    { labels_to_track.push_back(i); }
+  }
+  return labels_to_track;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> void
+pcl::SequentialSVClustering<PointT>::computeSIFTRequiredClouds(PointCloudIG::Ptr cloud_ig, PointCloudI::Ptr xyzi_total_cloud,
+                                                               typename PointCloudT::Ptr cloud, NormalCloud::Ptr normal_cloud)
+{
+  pcl::PointCloud<pcl::PointXYZRGB>::Ptr xyzrgb_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
+
+  // Convert previous voxel centroid cloud from XYZRGB/XYZRGBA to XYZI
+  copyPointCloud(*cloud, *xyzrgb_cloud);
+  PointCloudXYZRGBtoXYZI(*xyzrgb_cloud, *xyzi_total_cloud);
+
+  // Estimate the Intensity Gradient for this cloud
+  computeIntensityGradientCloud (cloud_ig, xyzi_total_cloud, normal_cloud);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> std::unordered_map<int, Eigen::Matrix<float, 4, 4>>
+pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters)
+{
+  // This will store the transforms that are valid
+  std::unordered_map<int, Eigen::Matrix<float, 4, 4>> found_transforms;
   // previous_keypoints is a map where the key is the label of the concerned supervoxel, and the value is a pair
   // consisting as first element of the Indices of the keypoints in the previous voxel centroid cloud and as second
   // element of the RIFT descriptor matching this indice.
   std::unordered_map< uint32_t, std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > > previous_keypoints;
   std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > current_keypoints;
 
+  // Parameters for sift computation
+  float min_scale = 0.005f;
+  float min_contrast = 0.03f;
+  int n_octaves = 4;
+  int n_scales_per_octave = 8;
+
+  // RANSAC variables
+  int min_number_of_inliers = 4;
+  float proba_of_pure_inlier = 0.99f;
+  int num_max_iter = 100; // Same as in Van Hoof paper
+
   if(getMaxLabel() > 0)
   {
-    // Get the labels of the disappeared and fully occluded supervoxels
-    int nb_occluded_voxels_by_labels[getMaxLabel ()] = {0};
-    int nb_voxels_by_labels[getMaxLabel ()] = {0};
-    for(typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin (); leaf_itr != sequential_octree_->end (); ++leaf_itr)
-    {
-      SequentialVoxelData& voxel = (*leaf_itr)->getData ();
-      if(voxel.frame_occluded_ != 0) // It is currently occluded
-      { ++nb_occluded_voxels_by_labels[voxel.label_ - 1]; }
-      ++nb_voxels_by_labels[voxel.label_ - 1];
-    }
-    for(auto cluster: supervoxel_clusters)
-    {
-      uint32_t i = cluster.first;
-      // If the sv has disappeared or is fully occluded
-      if(nb_voxels_by_labels[i - 1] == 0 ||
-         ( (nb_voxels_by_labels[i - 1] == nb_occluded_voxels_by_labels[i - 1]) && (supervoxel_clusters.find(i) != supervoxel_clusters.end()) ) )
-      { labels_to_track.push_back(i); }
-    }
-
-    // Parameters for sift computation
-    const float min_scale = 0.005f;
-    const int n_octaves = 4;
-    const int n_scales_per_octave = 8;
-    const float min_contrast = 0.03f;
-
+    // Get the labels that are to be tracked
+    std::vector<uint32_t> labels_to_track = getLabelsOfDynamicSV (supervoxel_clusters);
+    ///////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////COMPUTE KEYPOINTS AND DESCRIPTORS FOR PREVIOUS CLOUD//////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////
+    // Initiliaze the SIFT keypoints structure
     pcl::SIFTKeypoint<PointT, pcl::PointWithScale> sift;
     PointCloudScale sift_result;
     typename pcl::search::KdTree<PointT>::Ptr tree(new pcl::search::KdTree<PointT> ());
@@ -837,18 +847,11 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
     sift.setScales(min_scale, n_octaves, n_scales_per_octave);
     sift.setMinimumContrast(min_contrast);
 
-    // Pointclouds
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr xyzrgb_cloud(new pcl::PointCloud<pcl::PointXYZRGB>);
-    PointCloudI::Ptr xyzi_total_cloud(new PointCloudI);
-    // Convert previous voxel centroid cloud from XYZRGB/XYZRGBA to XYZI
-    copyPointCloud(*prev_voxel_centroid_cloud_, *xyzrgb_cloud);
-    PointCloudXYZRGBtoXYZI(*xyzrgb_cloud, *xyzi_total_cloud);
-
-    // Estimate the Intensity Gradient for this cloud
+    // Compute clouds
+    PointCloudI::Ptr xyzi_total_cloud (new PointCloudI);
     PointCloudIG::Ptr cloud_ig (new PointCloudIG);
-    computeIntensityGradientCloud (cloud_ig, xyzi_total_cloud, prev_voxel_centroid_normal_cloud_);
-
-    double in = timer_.getTime ();
+    computeSIFTRequiredClouds(cloud_ig, xyzi_total_cloud,
+                              prev_voxel_centroid_cloud_, prev_voxel_centroid_normal_cloud_);
 
     // Get SIFT keypoints and RIFT descriptors for each keypoint from precedent cloud for each label
     for(auto label: labels_to_track)
@@ -857,55 +860,28 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       {
         // Estimate the sift interest points using Intensity values from RGB values
         sift_result.clear ();
-        //        std::cout << "size of the voxel cloud to track: " << supervoxel_clusters[label]->voxels_->size () << "\n";
         sift.setInputCloud(supervoxel_clusters[label]->voxels_);
         sift.compute(sift_result);
         // Compute the RIFT descriptors
         std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > rift_output = computeRIFTDescriptors (sift_result, cloud_ig, xyzi_total_cloud);
-        if(rift_output.second->size () > 3)// Min number of keypoints in order to track the supervoxel
+        if(rift_output.second->size () > min_number_of_inliers)// Min number of keypoints in order to track the supervoxel
         {
           previous_keypoints.insert (std::pair< uint32_t,
                                      std::pair< pcl::IndicesPtr, PointCloudFeatureT::Ptr > >
                                      (label, rift_output));
-          //          std::cout << "Number of keypoints in supervoxel to track: " << rift_output.first->size () << "\n";
         }
       }
     }
-    double out = timer_.getTime ();
-    std::cout << "Time to compute SIFT+RIFT for previous keypoints: " << out - in << " ms\n";
-    //////////////////////////// NEW POINTS /////////////////////////////
+
+    ///////////////////////////////////////////////////////////////////////////////////////////
+    //////////////////COMPUTE KEYPOINTS AND DESCRIPTORS FOR CURRENT CLOUD//////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////
     if(previous_keypoints.size () > 0)
     {
-      // Pointclouds
-      xyzrgb_cloud.reset (new pcl::PointCloud<pcl::PointXYZRGB>);
-      xyzi_total_cloud.reset (new PointCloudI);
-      typename PointCloudT::Ptr cloud_filtered (new PointCloudT);
-      NormalCloud::Ptr normal_cloud_filtered (new NormalCloud);
-      // Filter noise from unlabeled voxel centroid cloud
-      // true to be able to extract the removed point indices
-      pcl::StatisticalOutlierRemoval<PointT> sor(true);
-      sor.setInputCloud (getUnlabeledVoxelCentroidCloud ());
-      sor.setMeanK (50);
-      sor.setStddevMulThresh (1);
-      sor.filter (*cloud_filtered);
-      pcl::IndicesConstPtr removed_indices = sor.getRemovedIndices ();
-      // Remove those indices from unlabeled normal cloud
-      pcl::ExtractIndices<pcl::Normal> extract;
-      extract.setInputCloud(getUnlabeledVoxelNormalCloud ());
-      extract.setIndices(removed_indices);
-      extract.setNegative(true);
-      extract.filter(*normal_cloud_filtered);
-      // Convert previous voxel centroid cloud from XYZRGB/XYZRGBA to XYZI
-      copyPointCloud (*getUnlabeledVoxelCentroidCloud (), *xyzrgb_cloud);
-      PointCloudXYZRGBtoXYZI (*xyzrgb_cloud, *xyzi_total_cloud);
-      std::cout << "size n: " << normal_cloud_filtered->size () << " size: " << cloud_filtered->size () << "\n";
-      std::cout << "size np: " << getUnlabeledVoxelNormalCloud ()->size () << " sizep: " << getUnlabeledVoxelCentroidCloud ()->size () << "\n";
-      std::cout << "size v: " << removed_indices->size () << "\n";
-
-      // Estimate the Intensity Gradient for this cloud
       cloud_ig.reset (new PointCloudIG);
-
-      computeIntensityGradientCloud (cloud_ig, xyzi_total_cloud, getUnlabeledVoxelNormalCloud ());
+      xyzi_total_cloud.reset (new PointCloudI);
+      computeSIFTRequiredClouds(cloud_ig, xyzi_total_cloud,
+                                getUnlabeledVoxelCentroidCloud (), getUnlabeledVoxelNormalCloud ());
 
       // Estimate the sift interest points using Intensity values from RGB values
       sift_result.clear ();
@@ -919,7 +895,7 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
           (boost::make_shared<std::vector<int>> (), boost::make_shared<PointCloudFeatureT> ());
 
       filterKeypoints(current_keypoints, filtered_keypoints);
-//      filtered_keypoints = current_keypoints;
+      //      filtered_keypoints = current_keypoints;
       std::cout << "Number of keypoints in current scene: " << filtered_keypoints.second->size () << "\n";
       int current_number_of_keypoints = filtered_keypoints.second->size ();
 
@@ -934,21 +910,17 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
       for(auto pair: previous_keypoints)
       {
         int label = pair.first;
-        int min_number_of_inliers = 4;
-
-
-        float proba_of_pure_inlier = 0.99f;
-        // Compute the number of iteration required to have the required
-        // probability of having a pure inlier sample
-        int num_max_iter = std::ceil (std::log(1.0 - proba_of_pure_inlier)
-                                      /std::log(1 - std::pow(1 - (1 - pair.second.second->size ()/static_cast<double>(current_number_of_keypoints))
-                                                             , min_number_of_inliers)));
-        //        std::cout << "Number of iterations required: " << num_max_iter << "\n";
-        // For now we use the same number of iteration as Van Hoof in his paper
-        num_max_iter = 100; // Same as in Van Hoof paper
         Eigen::Matrix<float, 4, 4> best_fit;
         int max_nb_of_inliers = 0;
         float best_err = std::numeric_limits<float>::max ();
+
+        // Compute the number of iteration required to have the required
+        // probability of having a pure inlier sample
+//        num_max_iter = std::ceil (std::log(1.0 - proba_of_pure_inlier)
+//                                      /std::log(1 - std::pow(1 - (1 - pair.second.second->size ()/static_cast<double>(current_number_of_keypoints))
+//                                                             , min_number_of_inliers)));
+        //        std::cout << "Number of iterations required: " << num_max_iter << "\n";
+
         // RANSAC implementation to find the transform that best explain
         // new keypoints observations
         for(size_t i = 0; i < num_max_iter; ++i)
@@ -1112,20 +1084,9 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
 
           }
 
-          // For each keypoint in this radius, check if it could match
-          // at least one keypoint of the previous supervoxel
-          // if so, add it as an inlier
-          // OR
           // (This need a GOOD transform)
           // Transform each point of supervoxel
           // Get NN distance, if below threshold add as inlier
-          // OR
-          // Use TransformationValidationEuclidean class to get
-          // the L2 squared norm between src and tgt cloud
-          // pcl::registration::TransformationValidationEuclidean<FeatureT, FeatureT, float> validator;
-          //////IDEE: on prend les maybe inliers, puis on trouve les autres inliers en regardant ceux qui correspondent
-          ///// dans un rayon seed_resolution autour du potentiel centroide
-          ///// ensuite on obtient une mesure basée sur le nombre d'inliers et si on passe un seuil c'est ok !
         }
         std::cout << "best fit has " << max_nb_of_inliers << " inliers\n";
         if(max_nb_of_inliers>0)
@@ -1139,18 +1100,27 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
 
           Eigen::Vector4f new_centroid = best_fit*prev_centroid;
 
-          lines_.insert (std::pair<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>>
-                         (label,
-                          std::pair<Eigen::Vector4f, Eigen::Vector4f>
-                          (prev_centroid, new_centroid)));
+//          lines_.insert (std::pair<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>>
+//                         (label,
+//                          std::pair<Eigen::Vector4f, Eigen::Vector4f>
+//                          (prev_centroid, new_centroid)));
+          found_transforms.insert (std::pair<int, Eigen::Matrix<float, 4, 4>>
+                                   (label, best_fit));
         }
         //    return bestFit
       }
     }
   }
-  ////////////////////////////////////////////////
-  ////////////////////////////////////////////////
-  ////////////////////////////////////////////////
+  return found_transforms;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> void
+pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &supervoxel_clusters, std::vector<int>& existing_seed_indices)
+{
+  //  std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output> matches;// = getMatches(supervoxel_clusters);
+  std::unordered_map<int, Eigen::Matrix<float, 4, 4>> matches = getMatchesRANSAC (supervoxel_clusters);
+  lines_.clear ();
 
   existing_seed_indices.clear ();
   supervoxel_helpers_.clear ();
@@ -1174,9 +1144,25 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
         nb_of_points += 1;
       }
     }
+    std::unordered_map<int, Eigen::Matrix<float, 4, 4>>::iterator unmap_matches_it = matches.find (label);
     // If the supervoxel was found using the matching method
-    if (matches.find(label) != matches.end ())
+    if (unmap_matches_it != matches.end ())
     {
+      pcl::PointXYZRGBA prev_centroid_tmp = supervoxel_clusters[label]->centroid_;
+
+      Eigen::Vector4f prev_centroid(prev_centroid_tmp.x,
+                                    prev_centroid_tmp.y,
+                                    prev_centroid_tmp.z,
+                                    1);
+
+      Eigen::Vector4f new_centroid = unmap_matches_it->second*prev_centroid;
+      lines_.insert (std::pair<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>>
+                     (label,
+                      std::pair<Eigen::Vector4f, Eigen::Vector4f>
+                      (prev_centroid, new_centroid)));
+      // Compute new centroid from matching method transform
+      centroid.getVector3fMap () = new_centroid.head<3> ();
+      /*
       pcl::PointXYZRGBA prev_centroid_tmp = supervoxel_clusters[label]->centroid_;
       PointT prev_centroid;
       prev_centroid.x = prev_centroid_tmp.x;
@@ -1203,9 +1189,11 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints(SequentialSVMapT &
           + matches.find(label)->second.rigid_transform_[8]*prev_z;
 
       Eigen::Vector3f new_centroid (x, y, z);
+
       //      lines_.insert (std::pair<uint32_t, std::pair<Eigen::Vector3f, Eigen::Vector3f>> (label, std::pair<Eigen::Vector3f, Eigen::Vector3f> (Eigen::Vector3f(prev_x, prev_y, prev_z), new_centroid)));
       // Compute new centroid from matching method transform
       centroid.getVector3fMap () = new_centroid;
+      */
     }
     // If there was points in it, add the closest point in kdtree as the seed point for this supervoxel
     else if (nb_of_points != 0)
