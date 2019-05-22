@@ -241,6 +241,8 @@ namespace pcl
       typedef pcl::Histogram<32> FeatureT;
       typedef flann::L2<float> DistanceT;
       typedef pcl::PointCloud<FeatureT> PointCloudFeatureT;
+      typedef std::pair<pcl::IndicesPtr, PointCloudFeatureT::Ptr> KeypointFeatureT;
+      typedef std::unordered_map<uint32_t, KeypointFeatureT> KeypointMapFeatureT;
 
       // Search and index types
       typedef search::FlannSearch<FeatureT, DistanceT> SearchT;
@@ -450,6 +452,12 @@ namespace pcl
       std::vector<uint32_t>
       getLabelsOfDynamicSV (SequentialSVMapT &supervoxel_clusters);
 
+      /** \brief This method initializes a SIFTKeypoints object with the inputed
+       * parameters and a KdTree search method */
+      void
+      initializeSIFT (pcl::SIFTKeypoint<PointT, pcl::PointWithScale> &sift,
+                      float min_scale, float min_contrast, int n_octaves = 4, int n_scales_per_octave = 8);
+
       /** \brief This method uses a RANSAC based algorithm to find matches to disappeared/occluded supervoxels from previous
        * frame that woud appear in the current frame
        * \param[out] matches found in the form of an STL unordered map with label as key and pcl::recognition::ObjRecRANSAC::Output as value
@@ -461,8 +469,37 @@ namespace pcl
        * frame that woud appear in the current frame
        * \param[out] matches found in the form of an STL unordered map with label as key and pcl::recognition::ObjRecRANSAC::Output as value
        */
-      std::unordered_map<int, Eigen::Matrix<float, 4, 4>>
+      std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>
       getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters);
+
+      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
+       * \note This overload compute keypoints and descriptors from the previous supervoxel clusters
+       * and stores it as a map linking the supervoxel label to a pair of indices (the keypoints in previous voxel cloud)
+       * and the corresponding descriptor cloud (FeatureT points) */
+      void
+      computeSIFTKeypointsAndRIFTDescriptors(SequentialSVMapT &supervoxel_clusters,
+                                             KeypointMapFeatureT &previous_keypoints,
+                                             int min_nb_of_keypoints,
+                                             float min_scale, float min_contrast,
+                                             int n_octaves = 4, int n_scales_per_octave = 8);
+
+      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
+       * \note This overload compute keypoints and descriptors from the current unlabeled voxel cloud
+       * and stores it as a pair of indices (the keypoints in previous voxel cloud)
+       * and the corresponding descriptor cloud (FeatureT points) */
+      void
+      computeSIFTKeypointsAndRIFTDescriptors(KeypointFeatureT &current_keypoints,
+                                             float min_scale, float min_contrast,
+                                             int n_octaves = 4, int n_scales_per_octave = 8);
+      /** \brief This method randomly draws nb_to_sample points from indices (and removes them
+       * from indices and cloud) and stores them accordingly in potential_inliers and
+       * potential_inliers_feature_cloud. */
+      void
+      samplePotentialInliers(std::vector<int> &indices,
+                             PointCloudFeatureT::Ptr &cloud,
+                             std::vector<int> &potential_inliers,
+                             PointCloudFeatureT::Ptr &potential_inliers_feature_cloud,
+                             int nb_to_sample);
 
       /** \brief Compute the voxel data (index of each voxel in the octree and normal of each voxel) */
       void
