@@ -501,6 +501,23 @@ namespace pcl
                              PointCloudFeatureT::Ptr &potential_inliers_feature_cloud,
                              int nb_to_sample);
 
+      /** \brief Compute the rigid transformation between the corresponding point indices
+       * designated by the two input vectors. Uses TransformationSVD to do so
+       * \note could add an overloaded method to accept pcl::Correspondances */
+      Eigen::Matrix<float, 4, 4>
+      computeRigidTransformation(std::vector<int> prev_indices, std::vector<int> curr_indices);
+
+      /** \brief This method search in spatial_neighbours which ones are keypoints and
+       * adds them as inliers if their distance in feature space is below a threshold */
+      void
+      findInliers(const PointCloudFeatureT::Ptr &search_cloud,
+                  const std::vector<int> &spatial_neighbors,
+                  const std::vector<int> &all_indices,
+                  const PointCloudFeatureT::Ptr &all_cloud,
+                  std::vector<int> &potential_inliers,
+                  PointCloudFeatureT::Ptr &potential_inliers_cloud,
+                  float threshold);
+
       /** \brief Compute the voxel data (index of each voxel in the octree and normal of each voxel) */
       void
       computeVoxelData ();
