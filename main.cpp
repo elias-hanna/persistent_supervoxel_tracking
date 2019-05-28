@@ -163,20 +163,18 @@ main( int argc, char** argv )
       //      if (!viewer->updatePointCloud (voxel_centroid_cloud, "voxel centroids"))
       //        viewer->addPointCloud (voxel_centroid_cloud, "voxel centroids");
       // With color
-      pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgb(voxel_centroid_cloud);
-      //      if (!viewer->updatePointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids"))
-      //        viewer->addPointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids");
+//      pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgb(voxel_centroid_cloud);
+//      if (!viewer->updatePointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids"))
+//        viewer->addPointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids");
 
 
-      //      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,2.0, "voxel centroids");
-      //      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,1, "voxel centroids");
+//      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,2.0, "voxel centroids");
+//      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,1, "voxel centroids");
 
       if (!viewer->updatePointCloud (labeled_voxel_cloud, "labeled voxels"))
         viewer->addPointCloud (labeled_voxel_cloud, "labeled voxels");
 
       viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY, 1, "labeled voxels");
-
-
 
       ////////////////////////////////////////////////////
       ////////////////////////////////////////////////////
@@ -187,18 +185,18 @@ main( int argc, char** argv )
       std::vector<int> current_keypoints_indices = super.current_keypoints_indices_;
       std::vector<int> previous_keypoints_indices = super.previous_keypoints_indices_;
 
-//      for(auto idx: current_keypoints_indices)
-//      {
-//        PointT pt = (*super.getUnlabeledVoxelCentroidCloud())[idx];
-//        viewer->addSphere(pt, 0.005, 0, 255, 0, "current keypoint " + std::to_string (idx));
-//      }
-//      for(auto idx: previous_keypoints_indices)
-//      {
-//        PointT pt = (*super.getPrevVoxelCentroidCloud())[idx];
-//        viewer->addSphere(pt, 0.005, 0, 0, 255, "previous keypoint " + std::to_string (idx));
-//      }
+      //      for(auto idx: current_keypoints_indices)
+      //      {
+      //        PointT pt = (*super.getUnlabeledVoxelCentroidCloud())[idx];
+      //        viewer->addSphere(pt, 0.005, 0, 255, 0, "current keypoint " + std::to_string (idx));
+      //      }
+      //      for(auto idx: previous_keypoints_indices)
+      //      {
+      //        PointT pt = (*super.getPrevVoxelCentroidCloud())[idx];
+      //        viewer->addSphere(pt, 0.005, 0, 0, 255, "previous keypoint " + std::to_string (idx));
+      //      }
 
-      std::unordered_map<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>> lines = super.lines_;
+      std::unordered_map<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>> lines;// = super.lines_;
       std::vector<uint32_t> label_color = super.getLabelColors ();
       for (auto line: lines)
       {
@@ -221,6 +219,21 @@ main( int argc, char** argv )
         viewer->addSphere(pt2, 0.005, 255, 0, 0, "end " + std::to_string (line.first));
       }
 
+      // TEST
+      PointT pt1;
+      pt1.x = 0;
+      pt1.y = 0;
+      pt1.z = 0;
+      PointT pt2;
+      pt2.x = 0;
+      pt2.y = 0;
+      pt2.z = 0;
+      viewer->addLine (pt1, pt2, "test");
+
+      viewer->addSphere(pt1, 0.005, 0, 255, 0, "start test");
+      viewer->addSphere(pt2, 0.005, 255, 0, 0, "end test");
+
+
       if(i!=0)
         viewer->spinOnce (time_pause_in_ms);
       else
@@ -231,14 +244,17 @@ main( int argc, char** argv )
         viewer->removeShape("start " + std::to_string (line.first));
         viewer->removeShape("end " + std::to_string (line.first));
       }
-//      for(auto idx: current_keypoints_indices)
-//      {
-//        viewer->removeShape("current keypoint " + std::to_string (idx));
-//      }
-//      for(auto idx: previous_keypoints_indices)
-//      {
-//        viewer->removeShape("previous keypoint " + std::to_string (idx));
-//      }
+      viewer->removeShape("test");
+      viewer->removeShape("start test");
+      viewer->removeShape("end test");
+      //      for(auto idx: current_keypoints_indices)
+      //      {
+      //        viewer->removeShape("current keypoint " + std::to_string (idx));
+      //      }
+      //      for(auto idx: previous_keypoints_indices)
+      //      {
+      //        viewer->removeShape("previous keypoint " + std::to_string (idx));
+      //      }
       ++i;
     }
   }

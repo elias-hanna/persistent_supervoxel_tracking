@@ -415,7 +415,6 @@ pcl::SequentialSVClustering<PointT>::expandSupervoxels ( int depth )
   }
 }
 
-
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::makeSupervoxels (SequentialSVMapT &supervoxel_clusters)
@@ -716,7 +715,7 @@ pcl::SequentialSVClustering<PointT>::computeKeypointsMatches(const std::vector<i
   {
     // We look up for k neighbours with k equal to the number of min
     // inliers
-    size_t k = to_match_feature_cloud.size ();
+    size_t k = indices_point_pair.first->size ();//to_match_feature_cloud.size ();
     search.nearestKSearch(to_match_feature_cloud[idx], static_cast<int> (k), k_indices, k_sqr_distances);
     neighbours_of_inliers.insert(std::pair<int, std::pair<std::vector<int>, std::vector<float>>>
                                  (idx,
@@ -728,7 +727,8 @@ pcl::SequentialSVClustering<PointT>::computeKeypointsMatches(const std::vector<i
   // keypoints (priority for order of importance for each neigbour)
   std::vector<int> unmatched_idx(to_match_indices.size ());
   std::iota(unmatched_idx.begin (), unmatched_idx.end (), 1);
-  for (size_t depth = 0; depth < to_match_indices.size (); ++depth)
+  //  for (size_t depth = 0; depth < to_match_indices.size (); ++depth)
+  for (size_t depth = 0; depth < indices_point_pair.first->size (); ++depth)
   {
     std::unordered_map<int, std::pair<int, float>> min;
     for (auto idx: unmatched_idx)
@@ -738,6 +738,10 @@ pcl::SequentialSVClustering<PointT>::computeKeypointsMatches(const std::vector<i
       if(neighbours_of_inliers[idx-1].second[depth] != 0.0)
       {
         std::unordered_map<int, std::pair<int, float>>::iterator map_it = min.find (neighbours_of_inliers[idx-1].first[depth]);
+        // Here to handle a bug where sometimes, a keypoints has for neighbour a point with big indice
+        // Don't know why it occurs, seems to happen with small input search clouds
+        if (neighbours_of_inliers[idx-1].first[depth] > indices_point_pair.first->size ())
+          continue;
         // If another point is competing for this match, compare errors
         if (map_it != min.end ())
         {
@@ -981,13 +985,11 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
   // element of the RIFT descriptor matching this indice.
   KeypointMapFeatureT previous_keypoints;
   KeypointFeatureT current_keypoints;
-
   // Parameters for sift computation
   float min_scale = 0.005f;
   float min_contrast = 0.03f;
   int n_octaves = 4;
   int n_scales_per_octave = 8;
-
   // RANSAC variables
   int min_number_of_inliers = 4;
   float proba_of_pure_inlier = 0.99f;
@@ -1001,14 +1003,12 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
     ///////////////////////////////////////////////////////////////////////////////////////////
     computeSIFTKeypointsAndRIFTDescriptors(supervoxel_clusters, previous_keypoints,
                                            min_number_of_inliers, min_scale, min_contrast);
-
     if(previous_keypoints.size () > 0)
     {
       ///////////////////////////////////////////////////////////////////////////////////////////
       //////////////////COMPUTE KEYPOINTS AND DESCRIPTORS FOR CURRENT CLOUD//////////////////////
       ///////////////////////////////////////////////////////////////////////////////////////////
       computeSIFTKeypointsAndRIFTDescriptors(current_keypoints, min_scale, min_contrast);
-
       current_keypoints_indices_ = *(current_keypoints.first);
       previous_keypoints_indices_.clear();
       for (auto pair: previous_keypoints)
@@ -1016,7 +1016,6 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
         previous_keypoints_indices_.insert(std::end(previous_keypoints_indices_),
                                            std::begin(*pair.second.first), std::end(*pair.second.first));
       }
-
       for(auto pair: previous_keypoints)
       {
         uint32_t label = pair.first;
@@ -1045,13 +1044,9 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
           Eigen::Matrix<float, 4, 4> transformation_est = computeRigidTransformation(matches_of_maybe_inliers, maybe_inliers);
           // Compute the new transformed centroid of the current supervoxel being matched
           pcl::PointXYZRGBA prev_centroid_tmp = supervoxel_clusters[label]->centroid_;
-          Eigen::Vector4f new_centroid, prev_centroid(prev_centroid_tmp.x,
-                                                      prev_centroid_tmp.y,
-                                                      prev_centroid_tmp.z,
-                                                      1);
+          Eigen::Vector4f new_centroid, prev_centroid(prev_centroid_tmp.x, prev_centroid_tmp.y, prev_centroid_tmp.z, 1);
           new_centroid = transformation_est*prev_centroid;
           pcl::PointXYZ cent(new_centroid[0], new_centroid[1], new_centroid[2]);
-
           // Do radius search around new estimated centroid
           // This search is only based on spatiality in a radius of
           // seed_resolution (we are looking for the previous supervoxel)
@@ -1064,11 +1059,9 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
           unlabeled_voxel_cloud_search->setInputCloud (xyz_cloud);
           unlabeled_voxel_cloud_search->radiusSearch (cent, seed_resolution_, k_indices, k_sqr_distances);
           // Find the current keypoints that are in this potential supervoxel
-          float threshold = 0.1f;
-
+          float threshold = 0.10f;
           findInliers(pair.second.second, k_indices, tmp_indices, tmp_cloud, maybe_inliers,
                       maybe_inliers_feature_cloud, threshold);
-
           // Condition: there is more than a quarter of possible matches
           // with a minimum of 6 (like in Van Hoof's paper)
           if(maybe_inliers.size () >= pair.second.second->size ()/4
@@ -1090,7 +1083,6 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
             PointCloudFeatureT::Ptr inliers_feature_cloud (new PointCloudFeatureT);
             findInliers(pair.second.second, k_indices, *current_keypoints.first,
                         current_keypoints.second, inliers, inliers_feature_cloud, threshold);
-
             if(inliers.size () > maybe_inliers.size ()
                && max_nb_of_inliers < inliers.size () )
             {
