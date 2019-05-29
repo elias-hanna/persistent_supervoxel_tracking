@@ -25,7 +25,7 @@ set(SRCS
 add_executable(main ${SRCS})
 
 # Link local libraries
-target_link_libraries(main  lib_tracker
+target_link_libraries(main  #lib_tracker
                             lib_papon)
 
 ########################### PCL Library ##########################

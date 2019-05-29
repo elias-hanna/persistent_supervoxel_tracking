@@ -40,6 +40,7 @@
 #include <pcl/search/impl/flann_search.hpp>
 #include <pcl/search/impl/search.hpp>
 #include <pcl/point_representation.h>
+#include <pcl/kdtree/impl/kdtree_flann.hpp>
 
 POINT_CLOUD_REGISTER_POINT_STRUCT (Histogram<32>,
                                    (float[32], histogram, histogram)
@@ -48,6 +49,7 @@ POINT_CLOUD_REGISTER_POINT_STRUCT (Histogram<32>,
 //template class pcl::DefaultFeatureRepresentation<pcl::Histogram<32>>;
 
 // Instantiations of specific point types
+template class pcl::KdTreeFLANN<pcl::Histogram<32>>;
 template class pcl::search::Search<pcl::Histogram<32>>;
 template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::L2<float>>;
 

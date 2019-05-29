@@ -697,6 +697,9 @@ template <typename PointT> std::vector<int>
 pcl::SequentialSVClustering<PointT>::computeKeypointsMatches(const std::vector<int> to_match_indices, const PointCloudFeatureT to_match_feature_cloud,
                                                              const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > indices_point_pair)
 {
+  pcl::KdTreeFLANN<FeatureT> search_test;
+  search_test.setInputCloud (indices_point_pair.second);
+  search_test.setEpsilon (0.05);
   // Search the nearest previous keypoint in feature space for each of the maybe inliers
   // in order to compute a transform using singular value decomposition
   // Instantiate search object with 4 randomized trees and 256 checks
@@ -854,9 +857,12 @@ pcl::SequentialSVClustering<PointT>::computeSIFTKeypointsAndRIFTDescriptors(Sequ
       sift.compute(sift_result);
       // Compute the RIFT descriptors
       KeypointFeatureT rift_output = computeRIFTDescriptors (sift_result, cloud_ig, xyzi_total_cloud);
-      if(rift_output.second->size () > min_nb_of_keypoints)// Min number of keypoints in order to track the supervoxel
+      KeypointFeatureT filtered_rift_output
+          (boost::make_shared<std::vector<int>> (), boost::make_shared<PointCloudFeatureT> ());
+      filterKeypoints(rift_output, filtered_rift_output);
+      if(filtered_rift_output.second->size () > min_nb_of_keypoints)// Min number of keypoints in order to track the supervoxel
       {
-        previous_keypoints.insert (std::pair<uint32_t, KeypointFeatureT> (label, rift_output));
+        previous_keypoints.insert (std::pair<uint32_t, KeypointFeatureT> (label, filtered_rift_output));
       }
     }
   }

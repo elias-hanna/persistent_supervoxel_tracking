@@ -40,25 +40,25 @@ add_library(lib_papon ${SRCS_PAPON} ${HEADERS_PAPON} ${IMPL_HEADERS_PAPON})
 
 ########################### SupervoxelTracker Library ##########################
 # Create variables with the files to compile
-set(SRCS_TRACKER
-    supervoxel_tracker/src/supervoxel_tracker.cpp
-    )
+#set(SRCS_TRACKER
+#    supervoxel_tracker/src/supervoxel_tracker.cpp
+#    )
 
-set(HEADERS_TRACKER
-    supervoxel_tracker/supervoxel_tracker.h
-    supervoxel_tracker/label_coherence.h
-    papon/supervoxel/sequential_supervoxel_clustering.h
-    )
+#set(HEADERS_TRACKER
+#    supervoxel_tracker/supervoxel_tracker.h
+#    supervoxel_tracker/label_coherence.h
+#    papon/supervoxel/sequential_supervoxel_clustering.h
+#    )
 
-set(IMPL_HEADERS_TRACKER
-    supervoxel_tracker/impl/supervoxel_tracker.hpp
-    supervoxel_tracker/impl/label_coherence.hpp
-    )
+#set(IMPL_HEADERS_TRACKER
+#    supervoxel_tracker/impl/supervoxel_tracker.hpp
+#    supervoxel_tracker/impl/label_coherence.hpp
+#    )
 
-# Add libraries (directories with sources files)
-add_library(lib_tracker ${SRCS_TRACKER} ${HEADERS_TRACKER} ${IMPL_HEADERS_TRACKER})
-target_include_directories(lib_tracker PUBLIC "papon/")
-target_link_libraries (lib_tracker lib_papon)
+## Add libraries (directories with sources files)
+#add_library(lib_tracker ${SRCS_TRACKER} ${HEADERS_TRACKER} ${IMPL_HEADERS_TRACKER})
+#target_include_directories(lib_tracker PUBLIC "papon/")
+#target_link_libraries (lib_tracker lib_papon)
 
 ########################### SequentialSupervoxelClustering Library ##########################
 # Create variables with the files to compile
@@ -86,8 +86,8 @@ if (PCL_FOUND)
   # Une fois la dépendance trouvée, nous l'incluons au projet
   target_include_directories(lib_papon PUBLIC ${PCL_INCLUDE_DIRS})
   target_link_libraries (lib_papon ${PCL_LIBRARIES})
-  target_include_directories(lib_tracker PUBLIC ${PCL_INCLUDE_DIRS})
-  target_link_libraries (lib_tracker ${PCL_LIBRARIES})
+#  target_include_directories(lib_tracker PUBLIC ${PCL_INCLUDE_DIRS})
+#  target_link_libraries (lib_tracker ${PCL_LIBRARIES})
 #  target_include_directories(lib_RANSAC PUBLIC ${PCL_INCLUDE_DIRS})
 #  target_link_libraries (lib_RANSAC ${PCL_LIBRARIES})
 else ()
