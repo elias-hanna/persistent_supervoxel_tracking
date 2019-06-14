@@ -3,6 +3,7 @@
 #include <pcl/io/pcd_io.h>
 #include <boost/make_shared.hpp>
 #include <pcl/visualization/pcl_visualizer.h>
+#include <pcl/filters/crop_box.h>
 // PCL tracking includes
 //#include <pcl/tracking/tracking.h>
 //#include <pcl/tracking/particle_filter.h>
@@ -33,6 +34,26 @@ typedef pcl::PointXYZRGBL PointRGBLT;
 typedef pcl::PointCloud<PointRGBLT> PointRGBLCloudT;
 
 typedef pcl::tracking::ParticleFilterTracker<PointT, StateT> ParticleFilter;
+
+POINT_CLOUD_REGISTER_POINT_STRUCT (Histogram<32>,
+                                   (float[32], histogram, histogram)
+)
+
+static bool show_prev = false;
+static bool show_curr = false;
+void
+keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event)
+{
+//  std::cout << "key: " << event.getKeySym() << "\n";
+  if (event.getKeySym() == "KP_1" && event.keyDown())
+  {
+    show_prev = !show_prev;
+  }
+  if (event.getKeySym() == "KP_2" && event.keyDown())
+  {
+    show_curr = !show_curr;
+  }
+}
 
 int 
 main( int argc, char** argv )
@@ -81,7 +102,9 @@ main( int argc, char** argv )
   boost::shared_ptr<pcl::Grabber> grabber = boost::make_shared<pcl::OpenNIGrabber>();
 
   // Pointcloud, used to store the cloud from the rgbd camera
-  PointCloudT cloud;
+  PointCloudT::Ptr cloud (new PointCloudT);
+  // Tmp Pointcloud, used to store the cloud from the rgbd camera
+  PointCloudT::Ptr tmp_cloud (new PointCloudT);
 
   // Vector of Pointclouds, used to store clouds from datasets
   std::vector<PointCloudT::Ptr> clouds;
@@ -93,7 +116,8 @@ main( int argc, char** argv )
   for(int i = 0 ; i < N_DATA ; i++)
   {
     PointCloudT::Ptr cloud(new PointCloudT);
-    std::string path = "../data/test" + std::to_string(i) + ".pcd";
+    //    std::string path = "../data/test" + std::to_string(i) + ".pcd";
+    std::string path = "../data/example_" + std::to_string(i) + ".pcd";
     pcl::console::print_highlight (("Loading point cloud" + std::to_string(i) + "...\n").c_str());
     if (pcl::io::loadPCDFile<PointT> (path, *cloud))
     {
@@ -124,26 +148,44 @@ main( int argc, char** argv )
   viewer->initCameraParameters ();
   viewer->setCameraPosition(0,0,0, 0,0,1, 0,-1,0);
 
+  viewer->registerKeyboardCallback(keyboardEventOccurred);
+
   int i = 0;
   while(!viewer->wasStopped ())
   {
+    cloud.reset (new PointCloudT);
+    tmp_cloud.reset (new PointCloudT);
     // Get the cloud
-    copyPointCloud(getter.getCloud(), cloud);
-//    copyPointCloud(*clouds[i%N_DATA], cloud);//cloud = clouds[i%N_DATA];
+    //    copyPointCloud(getter.getCloud(), cloud);
+
+    copyPointCloud(*clouds[(i++)%N_DATA], *tmp_cloud);//cloud = clouds[i%N_DATA];
+    //    PointT pt1;
+    //    pt1.x = -0.35;
+    //    pt1.y = 0.5;
+    //    pt1.z = 1;
+    //    PointT pt2;
+    //    pt2.x = 0.35;
+    //    pt2.y = -0.25;
+    //    pt2.z = 1.25;
+    float minX = -0.35; float minY = -0.25; float minZ = 1.;
+    float maxX = 0.35; float maxY = 0.5; float maxZ = 1.4;
+    pcl::CropBox<PointT> boxFilter;
+    boxFilter.setMin(Eigen::Vector4f(minX, minY, minZ, 1.0));
+    boxFilter.setMax(Eigen::Vector4f(maxX, maxY, maxZ, 1.0));
+    boxFilter.setInputCloud(tmp_cloud);
+    boxFilter.filter(*cloud);
 
     // If a cloud got captured from the device
-    if(!cloud.empty())
+    if(!cloud->empty())
     {
 
-      super.setInputCloud(boost::make_shared<PointCloudT>(cloud));
+      super.setInputCloud(boost::make_shared<PointCloudT>(*cloud));
 
       pcl::console::print_highlight ("Extracting supervoxels!\n");
 
       super.extract (supervoxel_clusters);
 
       pcl::console::print_info ("Found %d supervoxels\n", supervoxel_clusters.size ());
-
-
 
       // Get the voxel centroid cloud
       PointCloudT::Ptr voxel_centroid_cloud = super.getVoxelCentroidCloud ();
@@ -163,18 +205,23 @@ main( int argc, char** argv )
       //      if (!viewer->updatePointCloud (voxel_centroid_cloud, "voxel centroids"))
       //        viewer->addPointCloud (voxel_centroid_cloud, "voxel centroids");
       // With color
-//      pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgb(voxel_centroid_cloud);
-//      if (!viewer->updatePointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids"))
-//        viewer->addPointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids");
+      //      pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgb(voxel_centroid_cloud);
+      //      if (!viewer->updatePointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids"))
+      //        viewer->addPointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids");
 
+      // Show the current observed pointcloud
+      //      pcl::visualization::PointCloudColorHandlerRGBAField<PointT> rgba(cloud);
+      //      if (!viewer->updatePointCloud<PointT> (cloud, rgba, "voxel centroids"))
+      //        viewer->addPointCloud<PointT> (cloud, rgba, "voxel centroids");
 
-//      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,2.0, "voxel centroids");
-//      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,1, "voxel centroids");
+      //      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,2.0, "voxel centroids");
+      //      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,1., "voxel centroids");
+
 
       if (!viewer->updatePointCloud (labeled_voxel_cloud, "labeled voxels"))
         viewer->addPointCloud (labeled_voxel_cloud, "labeled voxels");
 
-      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY, 1, "labeled voxels");
+      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY, 1.f, "labeled voxels");
 
       ////////////////////////////////////////////////////
       ////////////////////////////////////////////////////
@@ -182,21 +229,29 @@ main( int argc, char** argv )
       ////////////////////////////////////////////////////
       ////////////////////////////////////////////////////
 
+      viewer->addText ("press NUM1 to show/hide previous keypoints",0, 0, "t_prev");
+      viewer->addText ("press NUM2 to show/hide current keypoints",0, 10, "t_curr");
+
       std::vector<int> current_keypoints_indices = super.current_keypoints_indices_;
       std::vector<int> previous_keypoints_indices = super.previous_keypoints_indices_;
 
-      //      for(auto idx: current_keypoints_indices)
-      //      {
-      //        PointT pt = (*super.getUnlabeledVoxelCentroidCloud())[idx];
-      //        viewer->addSphere(pt, 0.005, 0, 255, 0, "current keypoint " + std::to_string (idx));
-      //      }
-      //      for(auto idx: previous_keypoints_indices)
-      //      {
-      //        PointT pt = (*super.getPrevVoxelCentroidCloud())[idx];
-      //        viewer->addSphere(pt, 0.005, 0, 0, 255, "previous keypoint " + std::to_string (idx));
-      //      }
-
-      std::unordered_map<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>> lines;// = super.lines_;
+      if(show_curr)
+      {
+        for(auto idx: current_keypoints_indices)
+        {
+          PointT pt = (*super.getUnlabeledVoxelCentroidCloud())[idx];
+          viewer->addSphere(pt, 0.002, 125, 125, 0, "current keypoint " + std::to_string (idx));
+        }
+      }
+      if(show_prev)
+      {
+        for(auto idx: previous_keypoints_indices)
+        {
+          PointT pt = (*super.getPrevVoxelCentroidCloud())[idx];
+          viewer->addSphere(pt, 0.002, 0, 0, 255, "previous keypoint " + std::to_string (idx));
+        }
+      }
+      std::unordered_map<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>> lines = super.lines_;
       std::vector<uint32_t> label_color = super.getLabelColors ();
       for (auto line: lines)
       {
@@ -213,6 +268,9 @@ main( int argc, char** argv )
         pt2.x = line.second.second[0];
         pt2.y = line.second.second[1];
         pt2.z = line.second.second[2];
+        //        pt2.x = pt1.x + seed_resolution;
+        //        pt2.y = pt1.y;
+        //        pt2.z = pt1.z;
         viewer->addLine (pt1, pt2, r/255, g/255, b/255, std::to_string (line.first));
 
         viewer->addSphere(pt1, 0.005, 0, 255, 0, "start " + std::to_string (line.first));
@@ -220,42 +278,46 @@ main( int argc, char** argv )
       }
 
       // TEST
-      PointT pt1;
-      pt1.x = 0;
-      pt1.y = 0;
-      pt1.z = 0;
-      PointT pt2;
-      pt2.x = 0;
-      pt2.y = 0;
-      pt2.z = 0;
-      viewer->addLine (pt1, pt2, "test");
+      // Useful types
+      //      typedef pcl::Histogram<32> FeatureT;
+      ////      typedef flann::L1<float> DistanceT;
+      ////      typedef flann::L2<float> DistanceT;
+      //      typedef flann::KL_Divergence<float> DistanceT;
+      //      typedef pcl::search::FlannSearch<FeatureT, DistanceT> SearchT;
+      //      typedef typename SearchT::FlannIndexCreatorPtr CreatorPtrT;
+      //      typedef typename SearchT::KdTreeMultiIndexCreator IndexT;
+      //      typedef typename SearchT::PointRepresentationPtr RepresentationPtrT;
+      //      // Instantiate search object with 4 randomized trees and 128 checks
+      //      SearchT search (true, CreatorPtrT (new IndexT (4)));
+      //      search.setPointRepresentation (RepresentationPtrT (new pcl::DefaultFeatureRepresentation<FeatureT>));
+      //      search.setChecks (128); // The more checks the more precise the solution
+      //      FeatureT hist;
+      //      for (int k = 0; k < 32; ++k) { hist.histogram[i] = k/10.f; }
+      //      pcl::PointCloud<FeatureT>::Ptr search_cloud(new pcl::PointCloud<FeatureT>);
+      //      search_cloud->push_back (hist);
+      //      // search_cloud is filled with the keypoints to match
+      //      search.setInputCloud (search_cloud);
+      //      std::vector<int> indices;
+      //      std::vector<float> distances;
+      //      search.nearestKSearch(hist, 1, indices, distances);
+      //      std::cout << "distance: " << distances[0] << "\n";
+      // TEST
+      //      PointT pt1;
+      //      pt1.x = -0.35;
+      //      pt1.y = 0.5;
+      //      pt1.z = 1;
+      //      PointT pt2;
+      //      pt2.x = 0.35;
+      //      pt2.y = -0.25;
+      //      pt2.z = 1.25;
+      //      viewer->addLine (pt1, pt2, "test");
 
-      viewer->addSphere(pt1, 0.005, 0, 255, 0, "start test");
-      viewer->addSphere(pt2, 0.005, 255, 0, 0, "end test");
+      //      viewer->addSphere(pt1, 0.005, 0, 255, 0, "start test");
+      //      viewer->addSphere(pt2, 0.005, 255, 0, 0, "end test");
 
+      viewer->spinOnce (time_pause_in_ms);
 
-      if(i!=0)
-        viewer->spinOnce (time_pause_in_ms);
-      else
-        viewer->spinOnce (100);
-      for (auto line: lines)
-      {
-        viewer->removeShape(std::to_string (line.first));
-        viewer->removeShape("start " + std::to_string (line.first));
-        viewer->removeShape("end " + std::to_string (line.first));
-      }
-      viewer->removeShape("test");
-      viewer->removeShape("start test");
-      viewer->removeShape("end test");
-      //      for(auto idx: current_keypoints_indices)
-      //      {
-      //        viewer->removeShape("current keypoint " + std::to_string (idx));
-      //      }
-      //      for(auto idx: previous_keypoints_indices)
-      //      {
-      //        viewer->removeShape("previous keypoint " + std::to_string (idx));
-      //      }
-      ++i;
+      viewer->removeAllShapes ();
     }
   }
 

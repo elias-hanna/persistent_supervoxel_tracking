@@ -239,7 +239,11 @@ namespace pcl
 
       // Feature space search types
       typedef pcl::Histogram<32> FeatureT;
+//      typedef flann::L1<float> DistanceT; // Manhattan distance
       typedef flann::L2<float> DistanceT;
+//      typedef flann::KL_Divergence<float> DistanceT; // Kullback Leibler divergence ~= distance
+//      typedef flann::MinkowskiDistance<float> DistanceT;
+//      typedef flann::HistIntersectionDistance<float> DistanceT;
       typedef pcl::PointCloud<FeatureT> PointCloudFeatureT;
       typedef std::pair<pcl::IndicesPtr, PointCloudFeatureT::Ptr> KeypointFeatureT;
       typedef std::unordered_map<uint32_t, KeypointFeatureT> KeypointMapFeatureT;
@@ -378,6 +382,10 @@ namespace pcl
       pcl::PointCloud<pcl::Normal>::Ptr
       getUnlabeledVoxelNormalCloud () const;
 
+      /** \brief Compute the attribute unlabeled_voxel_centroid_normal_cloud_ */
+      void
+      computeUnlabeledVoxelCentroidNormalCloud (const PointIndices point_indices);
+
       /** \brief Gets the adjacency list (Boost Graph library) which gives connections between supervoxels
        *  \param[out] adjacency_list_arg BGL graph where supervoxel labels are vertices, edges are touching relationships
        */
@@ -489,6 +497,7 @@ namespace pcl
        * and the corresponding descriptor cloud (FeatureT points) */
       void
       computeSIFTKeypointsAndRIFTDescriptors(KeypointFeatureT &current_keypoints,
+                                             int min_nb_of_keypoints,
                                              float min_scale, float min_contrast,
                                              int n_octaves = 4, int n_scales_per_octave = 8);
       /** \brief This method randomly draws nb_to_sample points from indices (and removes them
@@ -516,7 +525,7 @@ namespace pcl
                   const PointCloudFeatureT::Ptr &all_cloud,
                   std::vector<int> &potential_inliers,
                   PointCloudFeatureT::Ptr &potential_inliers_cloud,
-                  float threshold);
+                  float threshold, float* err);
 
       /** \brief Compute the voxel data (index of each voxel in the octree and normal of each voxel) */
       void
@@ -585,6 +594,9 @@ namespace pcl
 
       /** \brief Contains the Voxelized centroid cloud of the unlabeled voxels */
       typename PointCloudT::Ptr unlabeled_voxel_centroid_cloud_;
+
+      /** \brief Contains the Normals of the current unlabeled voxel centroid cloud */
+      typename NormalCloud::Ptr unlabeled_voxel_centroid_normal_cloud_;
 
       /** \brief Contains the Voxelized centroid Cloud */
       typename PointCloudT::Ptr voxel_centroid_cloud_;

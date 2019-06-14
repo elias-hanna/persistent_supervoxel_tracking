@@ -49,10 +49,13 @@ POINT_CLOUD_REGISTER_POINT_STRUCT (Histogram<32>,
 //template class pcl::DefaultFeatureRepresentation<pcl::Histogram<32>>;
 
 // Instantiations of specific point types
-template class pcl::KdTreeFLANN<pcl::Histogram<32>>;
-template class pcl::search::Search<pcl::Histogram<32>>;
+//template class pcl::search::Search<pcl::Histogram<32>>;
+//template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::Hamming<float>>;
 template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::L2<float>>;
-
+template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::L1<float>>;
+template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::KL_Divergence<float>>;
+//template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::MinkowskiDistance<float>>;
+template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::HistIntersectionDistance<float>>;
 // Specialization of DefaultPointRepresentation class for Histogram<> class
 //namespace pcl {
 //  template <>
