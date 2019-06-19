@@ -54,6 +54,7 @@
 #include <pcl/registration/transformation_validation_euclidean.h>
 #include <pcl/registration/correspondence_estimation.h>
 #include <pcl/filters/statistical_outlier_removal.h>
+#include <pcl/features/fpfh_omp.h>
 //#include <pcl/kdtree/kdtree_flann.h>
 //// Turn off the verbose
 //#undef OBJ_REC_RANSAC_VERBOSE
@@ -238,9 +239,16 @@ namespace pcl
       typedef pcl::PointCloud<pcl::PointXYZI> PointCloudI;
 
       // Feature space search types
-      typedef pcl::Histogram<32> FeatureT;
-//      typedef flann::L1<float> DistanceT; // Manhattan distance
-      typedef flann::L2<float> DistanceT;
+//      typedef union FeatureT_
+//      {
+//          pcl::Histogram<32> rift32_descriptor;
+//          pcl::FPFHSignature33 fpfh33_descriptor;
+//      } FeatureT;
+
+//      typedef pcl::Histogram<32> FeatureT;
+      typedef pcl::FPFHSignature33 FeatureT;
+      typedef flann::L1<float> DistanceT; // Manhattan distance
+//      typedef flann::L2<float> DistanceT;
 //      typedef flann::KL_Divergence<float> DistanceT; // Kullback Leibler divergence ~= distance
 //      typedef flann::MinkowskiDistance<float> DistanceT;
 //      typedef flann::HistIntersectionDistance<float> DistanceT;
@@ -406,6 +414,12 @@ namespace pcl
       computeRIFTDescriptors (const PointCloudScale sift_result, const PointCloudIG::Ptr cloud_ig,
                               const PointCloudI::Ptr xyzi_total_cloud) const;
 
+      /** \brief This method computes the FPFH descriptors of the given keypoints
+       * \param[out] A pointcloud of the descriptors
+       */
+      std::pair< pcl::IndicesPtr, pcl::PointCloud<pcl::FPFHSignature33>::Ptr >
+      computeFPFHDescriptors (const PointCloudScale sift_result, const typename PointCloudT::Ptr cloud, const NormalCloud::Ptr normals) const;
+
       /** \brief This method filters out the keypoints where the descriptor don't hold enough information
        *  \note Should the descriptor always hold good information ? Don't know if it is a metaparameter
        * problem related to the use of the RIFTEstimation class or if it is normal. */
@@ -433,7 +447,7 @@ namespace pcl
        * that are required by the SIFT algorithm to compute keypoints
        */
       void
-      computeSIFTRequiredClouds (PointCloudIG::Ptr cloud_ig, PointCloudI::Ptr xyzi_total_cloud,
+      computeRIFTRequiredClouds (PointCloudIG::Ptr cloud_ig, PointCloudI::Ptr xyzi_total_cloud,
                                  typename PointCloudT::Ptr cloud, NormalCloud::Ptr normal_cloud);
 
       /** \brief Init the computation, update the sequential octree, perform global check to see wether supervoxel have changed
@@ -490,7 +504,6 @@ namespace pcl
                                              int min_nb_of_keypoints,
                                              float min_scale, float min_contrast,
                                              int n_octaves = 4, int n_scales_per_octave = 8);
-
       /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
        * \note This overload compute keypoints and descriptors from the current unlabeled voxel cloud
        * and stores it as a pair of indices (the keypoints in previous voxel cloud)
@@ -500,6 +513,25 @@ namespace pcl
                                              int min_nb_of_keypoints,
                                              float min_scale, float min_contrast,
                                              int n_octaves = 4, int n_scales_per_octave = 8);
+      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
+       * \note This overload compute keypoints and descriptors from the previous supervoxel clusters
+       * and stores it as a map linking the supervoxel label to a pair of indices (the keypoints in previous voxel cloud)
+       * and the corresponding descriptor cloud (FeatureT points) */
+      void
+      computeSIFTKeypointsAndFPFHDescriptors( SequentialSVMapT &supervoxel_clusters,
+                                              KeypointMapFeatureT &previous_keypoints,
+                                              int min_nb_of_keypoints,
+                                              float min_scale, float min_contrast,
+                                              int n_octaves = 4, int n_scales_per_octave = 8);
+      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
+       * \note This overload compute keypoints and descriptors from the current unlabeled voxel cloud
+       * and stores it as a pair of indices (the keypoints in previous voxel cloud)
+       * and the corresponding descriptor cloud (FeatureT points) */
+      void
+      computeSIFTKeypointsAndFPFHDescriptors( KeypointFeatureT &current_keypoints,
+                                              int min_nb_of_keypoints,
+                                              float min_scale, float min_contrast,
+                                              int n_octaves = 4, int n_scales_per_octave = 8);
       /** \brief This method randomly draws nb_to_sample points from indices (and removes them
        * from indices and cloud) and stores them accordingly in potential_inliers and
        * potential_inliers_feature_cloud. */

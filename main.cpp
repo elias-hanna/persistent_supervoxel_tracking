@@ -41,18 +41,18 @@ POINT_CLOUD_REGISTER_POINT_STRUCT (Histogram<32>,
 
 static bool show_prev = false;
 static bool show_curr = false;
+static bool show_labels = false;
+
 void
 keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event)
 {
-//  std::cout << "key: " << event.getKeySym() << "\n";
+  //  std::cout << "key: " << event.getKeySym() << "\n";
   if (event.getKeySym() == "KP_1" && event.keyDown())
-  {
-    show_prev = !show_prev;
-  }
+  { show_prev = !show_prev; }
   if (event.getKeySym() == "KP_2" && event.keyDown())
-  {
-    show_curr = !show_curr;
-  }
+  { show_curr = !show_curr; }
+  if (event.getKeySym () == "KP_3" && event.keyDown ())
+  { show_labels = !show_labels; }
 }
 
 int 
@@ -209,19 +209,20 @@ main( int argc, char** argv )
       //      if (!viewer->updatePointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids"))
       //        viewer->addPointCloud<PointT> (voxel_centroid_cloud, rgb, "voxel centroids");
 
-      // Show the current observed pointcloud
-      //      pcl::visualization::PointCloudColorHandlerRGBAField<PointT> rgba(cloud);
-      //      if (!viewer->updatePointCloud<PointT> (cloud, rgba, "voxel centroids"))
-      //        viewer->addPointCloud<PointT> (cloud, rgba, "voxel centroids");
-
-      //      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE,2.0, "voxel centroids");
-      //      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,1., "voxel centroids");
 
 
-      if (!viewer->updatePointCloud (labeled_voxel_cloud, "labeled voxels"))
-        viewer->addPointCloud (labeled_voxel_cloud, "labeled voxels");
-
-      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY, 1.f, "labeled voxels");
+      if (show_labels) // Show the labeled observed pointcloud
+      {
+        if (!viewer->updatePointCloud (labeled_voxel_cloud, "displayed cloud"))
+        { viewer->addPointCloud (labeled_voxel_cloud, "displayed cloud"); }
+      }
+      else // Show the observed pointcloud
+      {
+        pcl::visualization::PointCloudColorHandlerRGBAField<PointT> rgba(cloud);
+        if (!viewer->updatePointCloud<PointT> (cloud, rgba, "displayed cloud"))
+        { viewer->addPointCloud<PointT> (cloud, rgba, "displayed cloud"); }
+      }
+      viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,1., "displayed cloud");
 
       ////////////////////////////////////////////////////
       ////////////////////////////////////////////////////
@@ -231,7 +232,7 @@ main( int argc, char** argv )
 
       viewer->addText ("press NUM1 to show/hide previous keypoints",0, 0, "t_prev");
       viewer->addText ("press NUM2 to show/hide current keypoints",0, 10, "t_curr");
-
+      viewer->addText ("press NUM3 to switch between labelized/normal view of cloud",0, 20, "t_cloud");
       std::vector<int> current_keypoints_indices = super.current_keypoints_indices_;
       std::vector<int> previous_keypoints_indices = super.previous_keypoints_indices_;
 
@@ -318,6 +319,7 @@ main( int argc, char** argv )
       viewer->spinOnce (time_pause_in_ms);
 
       viewer->removeAllShapes ();
+      viewer->removeAllPointClouds ();
     }
   }
 
