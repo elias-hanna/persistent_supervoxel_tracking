@@ -903,6 +903,8 @@ pcl::SequentialSVClustering<PointT>::computeSIFTKeypointsAndFPFHDescriptors(Sequ
 {
   // Get the labels that need to be tracked
   std::vector<uint32_t> labels_to_track = getLabelsOfDynamicSV (supervoxel_clusters);
+  for (const auto& label: labels_to_track)
+  { std::cout << "to track: " << label << "\n"; }
   // Initiliaze the SIFT keypoints structure
   pcl::SIFTKeypoint<PointT, pcl::PointWithScale> sift;
   initializeSIFT (sift, min_scale, min_contrast, n_octaves, n_scales_per_octave);
@@ -1151,13 +1153,13 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
   KeypointMapFeatureT previous_keypoints;
   KeypointFeatureT current_keypoints;
   // Parameters for sift computation
-  float min_scale = 0.005f;
-  float min_contrast = 0.6f;
+  float min_scale = 0.003f;
+  float min_contrast = 0.5f;
   // RANSAC variables
   int min_number_of_inliers = 3;
   float proba_of_pure_inlier = 0.99f;
   int num_max_iter = 100; // Same as in Van Hoof paper
-  float threshold = 60.f;
+  float threshold = 100.f;
   std::vector<uint32_t> labels;
 
   if(getMaxLabel() > 0)
@@ -1198,50 +1200,55 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
         for(size_t i = 0; i < num_max_iter; ++i)
         {
           // Temporary structures that store copies from current keypoints data
-//          std::vector<int> tmp_indices = *current_keypoints.first;
-//          PointCloudFeatureT::Ptr tmp_cloud (new PointCloudFeatureT);
-//          copyPointCloud (*current_keypoints.second, *tmp_cloud);
-//          // Temporary structures that store copies from previous keypoints data
-//          std::vector<int> tmp_indices_prev = *pair.second.first;
-//          PointCloudFeatureT::Ptr tmp_cloud_prev (new PointCloudFeatureT);
-//          copyPointCloud (*pair.second.second, *tmp_cloud_prev);
-//          // Structures that store potential inliers data
-//          std::vector<int> maybe_inliers;
-//          maybe_inliers.reserve (min_number_of_inliers);
-//          PointCloudFeatureT::Ptr maybe_inliers_feature_cloud (new PointCloud<FeatureT>);
-//          // Draw min_number_of_inliers samples from the observed keypoint cloud
-//          //          samplePotentialInliers(tmp_indices, tmp_cloud, maybe_inliers, maybe_inliers_feature_cloud, min_number_of_inliers);
-//          samplePotentialInliers(tmp_indices_prev, tmp_cloud_prev, maybe_inliers, maybe_inliers_feature_cloud, min_number_of_inliers);
-//          // Compute keypoints matches with maybe inliers
-//          std::vector<int> matches_of_maybe_inliers = computeKeypointsMatches(maybe_inliers, *maybe_inliers_feature_cloud,
-//                                                                              current_keypoints);
-//          // Compute the transform between the points sampled from data and the previous keypoints
-//          Eigen::Matrix<float, 4, 4> transformation_est = computeRigidTransformation(maybe_inliers, matches_of_maybe_inliers);
-//          // Compute the new transformed centroid of the current supervoxel being matched
-//          pcl::PointXYZRGBA prev_centroid_tmp = supervoxel_clusters[label]->centroid_;
-//          Eigen::Vector4f new_centroid, prev_centroid(prev_centroid_tmp.x, prev_centroid_tmp.y, prev_centroid_tmp.z, 1);
-//          new_centroid = transformation_est*prev_centroid;
-//          pcl::PointXYZ cent(new_centroid[0], new_centroid[1], new_centroid[2]);
-          // Temporary structures that store copies from current keypoints data
           std::vector<int> tmp_indices = *current_keypoints.first;
           PointCloudFeatureT::Ptr tmp_cloud (new PointCloudFeatureT);
           copyPointCloud (*current_keypoints.second, *tmp_cloud);
+          // Temporary structures that store copies from previous keypoints data
+          std::vector<int> tmp_indices_prev = *pair.second.first;
+          PointCloudFeatureT::Ptr tmp_cloud_prev (new PointCloudFeatureT);
+          copyPointCloud (*pair.second.second, *tmp_cloud_prev);
           // Structures that store potential inliers data
           std::vector<int> maybe_inliers;
           maybe_inliers.reserve (min_number_of_inliers);
           PointCloudFeatureT::Ptr maybe_inliers_feature_cloud (new PointCloud<FeatureT>);
           // Draw min_number_of_inliers samples from the observed keypoint cloud
-          samplePotentialInliers(tmp_indices, tmp_cloud, maybe_inliers, maybe_inliers_feature_cloud, min_number_of_inliers);
+          //          samplePotentialInliers(tmp_indices, tmp_cloud, maybe_inliers, maybe_inliers_feature_cloud, min_number_of_inliers);
+          samplePotentialInliers(tmp_indices_prev, tmp_cloud_prev, maybe_inliers, maybe_inliers_feature_cloud, min_number_of_inliers);
           // Compute keypoints matches with maybe inliers
           std::vector<int> matches_of_maybe_inliers = computeKeypointsMatches(maybe_inliers, *maybe_inliers_feature_cloud,
-                                                                              pair.second);
+                                                                              current_keypoints);
           // Compute the transform between the points sampled from data and the previous keypoints
-          Eigen::Matrix<float, 4, 4> transformation_est = computeRigidTransformation(matches_of_maybe_inliers, maybe_inliers);
+          Eigen::Matrix<float, 4, 4> transformation_est = computeRigidTransformation(maybe_inliers, matches_of_maybe_inliers);
           // Compute the new transformed centroid of the current supervoxel being matched
           pcl::PointXYZRGBA prev_centroid_tmp = supervoxel_clusters[label]->centroid_;
           Eigen::Vector4f new_centroid, prev_centroid(prev_centroid_tmp.x, prev_centroid_tmp.y, prev_centroid_tmp.z, 1);
           new_centroid = transformation_est*prev_centroid;
           pcl::PointXYZ cent(new_centroid[0], new_centroid[1], new_centroid[2]);
+
+//          found_transforms.insert (std::pair<uint32_t, Eigen::Matrix<float, 4, 4>>
+//                                   (label, transformation_est));
+//          labels.push_back(label);
+//          break;
+          // Temporary structures that store copies from current keypoints data
+//          std::vector<int> tmp_indices = *current_keypoints.first;
+//          PointCloudFeatureT::Ptr tmp_cloud (new PointCloudFeatureT);
+//          copyPointCloud (*current_keypoints.second, *tmp_cloud);
+//          // Structures that store potential inliers data
+//          std::vector<int> maybe_inliers;
+//          maybe_inliers.reserve (min_number_of_inliers);
+//          PointCloudFeatureT::Ptr maybe_inliers_feature_cloud (new PointCloud<FeatureT>);
+//          // Draw min_number_of_inliers samples from the observed keypoint cloud
+//          samplePotentialInliers(tmp_indices, tmp_cloud, maybe_inliers, maybe_inliers_feature_cloud, min_number_of_inliers);
+//          // Compute keypoints matches with maybe inliers
+//          std::vector<int> matches_of_maybe_inliers = computeKeypointsMatches(maybe_inliers, *maybe_inliers_feature_cloud,
+//                                                                              pair.second);
+//          // Compute the transform between the points sampled from data and the previous keypoints
+//          Eigen::Matrix<float, 4, 4> transformation_est = computeRigidTransformation(matches_of_maybe_inliers, maybe_inliers);
+//          // Compute the new transformed centroid of the current supervoxel being matched
+//          pcl::PointXYZRGBA prev_centroid_tmp = supervoxel_clusters[label]->centroid_;
+//          Eigen::Vector4f new_centroid, prev_centroid(prev_centroid_tmp.x, prev_centroid_tmp.y, prev_centroid_tmp.z, 1);
+//          new_centroid = transformation_est*prev_centroid;
+//          pcl::PointXYZ cent(new_centroid[0], new_centroid[1], new_centroid[2]);
 
           // Do radius search around new estimated centroid
           // This search is only based on spatiality in a radius of
@@ -1263,10 +1270,15 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
           voxel_cloud_search->radiusSearch (cent, seed_resolution_/2., k_indices, k_sqr_distances);
           float err;
           // Find the current keypoints below thresh that are in this potential supervoxel
+//          findInliers(pair.second.second, k_indices, tmp_indices, tmp_cloud, maybe_inliers,
+//                      maybe_inliers_feature_cloud, threshold, &err);
+          maybe_inliers.clear ();
+          maybe_inliers_feature_cloud.reset (new PointCloudFeatureT);
           findInliers(pair.second.second, k_indices, tmp_indices, tmp_cloud, maybe_inliers,
                       maybe_inliers_feature_cloud, threshold, &err);
           // Condition: there is more than a quarter of possible matches
           // with a minimum of 6 (like in Van Hoof's paper)
+          std::cout << "mb inliers size: " << maybe_inliers.size () << "\n";
           if(maybe_inliers.size () >= pair.second.second->size ()/4)
             //             && maybe_inliers.size () > 6)
           {
@@ -1323,161 +1335,6 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
   computeVoxelData (); // COULD DO BETTER DON'T NEED TO RECALCULATE THE NORMALS
   return (found_transforms);
 }
-
-/*
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointT> std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>
-pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters)
-{
-  // This will store the transforms that are valid
-  std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>> found_transforms;
-  // previous_keypoints is a map where the key is the label of the concerned supervoxel, and the value is a pair
-  // consisting as first element of the Indices of the keypoints in the previous voxel centroid cloud and as second
-  // element of the RIFT descriptor matching this indice.
-  KeypointMapFeatureT previous_keypoints;
-  KeypointFeatureT current_keypoints;
-  // Parameters for sift computation
-  float min_scale = 0.001f;
-  float min_contrast = 0.1f;
-  // RANSAC variables
-  int min_number_of_inliers = 3;
-  float proba_of_pure_inlier = 0.99f;
-  int num_max_iter = 100; // Same as in Van Hoof paper
-  float threshold = 0.1f;
-  std::vector<uint32_t> labels;
-
-  if(getMaxLabel() > 0)
-  {
-    ///////////////////////////////////////////////////////////////////////////////////////////
-    /////////////////COMPUTE KEYPOINTS AND DESCRIPTORS FOR PREVIOUS CLOUD//////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////
-    computeSIFTKeypointsAndRIFTDescriptors(supervoxel_clusters, previous_keypoints,
-                                           min_number_of_inliers, min_scale, min_contrast);
-    if(previous_keypoints.size () > 0)
-    {
-      ///////////////////////////////////////////////////////////////////////////////////////////
-      //////////////////COMPUTE KEYPOINTS AND DESCRIPTORS FOR CURRENT CLOUD//////////////////////
-      ///////////////////////////////////////////////////////////////////////////////////////////
-      computeSIFTKeypointsAndRIFTDescriptors(current_keypoints, min_number_of_inliers,min_scale, min_contrast);
-      // If there is not enough keypoints in current scene
-      if (current_keypoints.first->size () < min_number_of_inliers)
-      { return (found_transforms); }
-      current_keypoints_indices_ = *(current_keypoints.first);
-      previous_keypoints_indices_.clear();
-      for (auto pair: previous_keypoints)
-      {
-        previous_keypoints_indices_.insert(std::end(previous_keypoints_indices_),
-                                           std::begin(*pair.second.first), std::end(*pair.second.first));
-      }
-      for(auto pair: previous_keypoints)
-      {
-        uint32_t label = pair.first;
-        Eigen::Matrix<float, 4, 4> best_fit;
-        int max_nb_of_inliers = 0;
-        float best_err = std::numeric_limits<float>::max ();
-
-        // RANSAC implementation to find the transform that best explain
-        // new keypoints observations
-        for(size_t i = 0; i < num_max_iter; ++i)
-        {
-          // Temporary structures that store copies from current keypoints data
-          std::vector<int> tmp_indices = *current_keypoints.first;
-          PointCloudFeatureT::Ptr tmp_cloud (new PointCloudFeatureT);
-          copyPointCloud (*current_keypoints.second, *tmp_cloud);
-          // Temporary structures that store copies from previous keypoints data
-          std::vector<int> tmp_indices_prev = *pair.second.first;
-          PointCloudFeatureT::Ptr tmp_cloud_prev (new PointCloudFeatureT);
-          copyPointCloud (*pair.second.second, *tmp_cloud_prev);
-          // Structures that store potential inliers data
-          std::vector<int> maybe_inliers;
-          maybe_inliers.reserve (min_number_of_inliers);
-          PointCloudFeatureT::Ptr maybe_inliers_feature_cloud (new PointCloud<FeatureT>);
-          // Draw min_number_of_inliers samples from the observed keypoint cloud
-          //          samplePotentialInliers(tmp_indices, tmp_cloud, maybe_inliers, maybe_inliers_feature_cloud, min_number_of_inliers);
-          samplePotentialInliers(tmp_indices_prev, tmp_cloud_prev, maybe_inliers, maybe_inliers_feature_cloud, min_number_of_inliers);
-          // Compute keypoints matches with maybe inliers
-          std::vector<int> matches_of_maybe_inliers = computeKeypointsMatches(maybe_inliers, *maybe_inliers_feature_cloud,
-                                                                              current_keypoints);
-          // Compute the transform between the points sampled from data and the previous keypoints
-          Eigen::Matrix<float, 4, 4> transformation_est = computeRigidTransformation(maybe_inliers, matches_of_maybe_inliers);
-          // Compute the new transformed centroid of the current supervoxel being matched
-          pcl::PointXYZRGBA prev_centroid_tmp = supervoxel_clusters[label]->centroid_;
-          Eigen::Vector4f new_centroid, prev_centroid(prev_centroid_tmp.x, prev_centroid_tmp.y, prev_centroid_tmp.z, 1);
-          new_centroid = transformation_est*prev_centroid;
-          pcl::PointXYZ cent(new_centroid[0], new_centroid[1], new_centroid[2]);
-          best_fit = transformation_est;
-          // Do radius search around new estimated centroid
-          // This search is only based on spatiality in a radius of
-          // seed_resolution (we are looking for the previous supervoxel)
-//          std::vector<int> k_indices;
-//          std::vector<float> k_sqr_distances;
-//          typename pcl::search::KdTree<pcl::PointXYZ>::Ptr unlabeled_voxel_cloud_search;
-//          unlabeled_voxel_cloud_search.reset (new pcl::search::KdTree<pcl::PointXYZ>);
-//          pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cloud(new pcl::PointCloud<pcl::PointXYZ>);
-//          //          copyPointCloud(*getUnlabeledVoxelCentroidCloud (), *xyz_cloud);
-//          copyPointCloud(*unlabeled_voxel_centroid_cloud_, *xyz_cloud);
-//          unlabeled_voxel_cloud_search->setInputCloud (xyz_cloud);
-//          unlabeled_voxel_cloud_search->radiusSearch (cent, seed_resolution_, k_indices, k_sqr_distances);
-//          float err;
-//          // Find the current keypoints that are in this potential supervoxel
-//          findInliers(pair.second.second, k_indices, tmp_indices, tmp_cloud, maybe_inliers,
-//                      maybe_inliers_feature_cloud, threshold, &err);
-//          // Condition: there is more than a quarter of possible matches
-//          // with a minimum of 6 (like in Van Hoof's paper)
-//          if(maybe_inliers.size () >= pair.second.second->size ()/4)
-//            //             && maybe_inliers.size () > 6)
-//          {
-//            // Compute keypoints matches with maybe inliers
-//            std::vector<int> matches_of_maybe_inliers = computeKeypointsMatches(maybe_inliers, *maybe_inliers_feature_cloud,
-//                                                                                pair.second);
-//            transformation_est = computeRigidTransformation(matches_of_maybe_inliers, maybe_inliers);
-//            // Compute the new transformed centroid of the current supervoxel being matched
-//            new_centroid = transformation_est*prev_centroid;
-//            pcl::PointXYZ cent_refit(new_centroid[0], new_centroid[1], new_centroid[2]);
-//            // Do radius search around new estimated centroid
-//            // This search is only based on spatiality in a radius of
-//            // seed_resolution (we are looking for the previous supervoxel)
-//            unlabeled_voxel_cloud_search->radiusSearch (cent_refit, seed_resolution_, k_indices, k_sqr_distances);
-//            // Find the current keypoints that are in this potential supervoxel
-//            std::vector<int> inliers;
-//            PointCloudFeatureT::Ptr inliers_feature_cloud (new PointCloudFeatureT);
-//            findInliers(pair.second.second, k_indices, *current_keypoints.first,
-//                        current_keypoints.second, inliers, inliers_feature_cloud, threshold, &err);
-//            // score = coeff*scoreinliers + coeff*scoreerr
-//            // scoreinliers = 1
-//            // scoreerr = 1
-//            float coeff_in = 1.f; float coeff_err = 10.f;
-//            float best_score = coeff_in * max_nb_of_inliers/pair.second.second->size () + ((coeff_err * (threshold - best_err) > 0)?coeff_err * (threshold - best_err)/threshold:0);
-//            float curr_score = coeff_in * inliers.size()/pair.second.second->size () + ((coeff_err * (threshold - err) > 0)?coeff_err * (threshold - err)/threshold:0);
-//            //            std::cout << "err: " << err << " curr: " << curr_score << " best: " << best_score << "\n";
-//            //            if(inliers.size () > maybe_inliers.size ()
-//            //               && max_nb_of_inliers <= inliers.size ()
-//            //               && err <= best_err)
-//            if (curr_score > best_score
-//                && inliers.size () >= maybe_inliers.size ())
-//            {
-//              best_fit = transformation_est;
-//              max_nb_of_inliers = inliers.size ();
-//              best_err = err;
-//            }
-//          }
-        }
-        if(true)//max_nb_of_inliers>0)
-        {
-          std::cout << "SV w/ label " << label << " was matched !\nThe found transform has "
-                    << max_nb_of_inliers << " inliers\n";
-          found_transforms.insert (std::pair<uint32_t, Eigen::Matrix<float, 4, 4>>
-                                   (label, best_fit));
-          labels.push_back(label);
-        }
-      }
-    }
-  }
-  // Update the octree to remove the voxels of the matched SVs
-  sequential_octree_->updateOctreeFromMatchedClouds(labels);
-  computeVoxelData (); // COULD DO BETTER DON'T NEED TO RECALCULATE THE NORMALS
-  return (found_transforms);
-}*/
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void

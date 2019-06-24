@@ -261,16 +261,16 @@ main( int argc, char** argv )
     //    pt2.x = 0.35;
     //    pt2.y = -0.25;
     //    pt2.z = 1.25 - 0.02;
-    //    viewer->addLine (pt1, pt2, "test_line");
-    //    viewer->addSphere(pt1, 0.005, 0, 255, 0, "start_test ");
-    //    viewer->addSphere(pt2, 0.005, 255, 0, 0, "end_test ");
-    //    float minX = -0.25; float minY = -0.25; float minZ = 1.1;
-    //    float maxX = 0.45; float maxY = 0.5; float maxZ = 1.5;
-    //    pcl::CropBox<PointT> boxFilter;
-    //    boxFilter.setMin(Eigen::Vector4f(minX, minY, minZ, 1.0));
-    //    boxFilter.setMax(Eigen::Vector4f(maxX, maxY, maxZ, 1.0));
-    //    boxFilter.setInputCloud(tmp_cloud);
-    //    boxFilter.filter(*cloud);
+//    viewer->addLine (pt1, pt2, "test_line");
+//    viewer->addSphere(pt1, 0.005, 0, 255, 0, "start_test ");
+//    viewer->addSphere(pt2, 0.005, 255, 0, 0, "end_test ");
+//    float minX = -0.25; float minY = -0.25; float minZ = 1.;
+//    float maxX = 0.45; float maxY = 0.5; float maxZ = 1.5;
+//    pcl::CropBox<PointT> boxFilter;
+//    boxFilter.setMin(Eigen::Vector4f(minX, minY, minZ, 1.0));
+//    boxFilter.setMax(Eigen::Vector4f(maxX, maxY, maxZ, 1.0));
+//    boxFilter.setInputCloud(tmp_cloud);
+//    boxFilter.filter(*cloud);
     copyPointCloud(*tmp_cloud, *cloud);//cloud = clouds[i%N_DATA];
 
     // If a cloud got captured from the device
