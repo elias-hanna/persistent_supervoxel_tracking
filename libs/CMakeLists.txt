@@ -38,21 +38,20 @@ set(IMPL_HEADERS_PAPON
 # Add libraries (directories with sources files)
 add_library(lib_papon ${SRCS_PAPON} ${HEADERS_PAPON} ${IMPL_HEADERS_PAPON})
 
-########################### SupervoxelTracker Library ##########################
-# Create variables with the files to compile
+########################### RansacSupervoxelTracker Library ##########################
+
+#Create variables with the files to compile
 #set(SRCS_TRACKER
-#    supervoxel_tracker/src/supervoxel_tracker.cpp
+#    ransac_supervoxel_tracker/src/ransac_supervoxel_tracker.cpp
 #    )
 
 #set(HEADERS_TRACKER
-#    supervoxel_tracker/supervoxel_tracker.h
-#    supervoxel_tracker/label_coherence.h
+#    ransac_supervoxel_tracker/ransac_supervoxel_tracker.h
 #    papon/supervoxel/sequential_supervoxel_clustering.h
 #    )
 
 #set(IMPL_HEADERS_TRACKER
-#    supervoxel_tracker/impl/supervoxel_tracker.hpp
-#    supervoxel_tracker/impl/label_coherence.hpp
+#    ransac_supervoxel_tracker/impl/ransac_supervoxel_tracker.hpp
 #    )
 
 ## Add libraries (directories with sources files)

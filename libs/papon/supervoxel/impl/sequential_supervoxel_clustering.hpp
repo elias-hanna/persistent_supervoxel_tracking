@@ -800,8 +800,8 @@ pcl::SequentialSVClustering<PointT>::computeKeypointsMatches(const std::vector<i
     {
       // If the distance equals to 0, it's a bug because we search too far
       // around the point when building neighbours_of_inliers
-      if(neighbours_of_inliers[idx-1].second[depth] != 0.0)
-      {
+//      if(neighbours_of_inliers[idx-1].second[depth] != 0.0)
+//      {
         std::unordered_map<int, std::pair<int, float>>::iterator map_it = min.find (neighbours_of_inliers[idx-1].first[depth]);
         // Here to handle a bug where sometimes, a keypoints has for neighbour a point with big indice
         // Don't know why it occurs, seems to happen with small input search clouds
@@ -824,7 +824,7 @@ pcl::SequentialSVClustering<PointT>::computeKeypointsMatches(const std::vector<i
                      std::pair<int, float>
                      (idx-1, neighbours_of_inliers[idx-1].second[depth])));
         }
-      }
+//      }
     }
     // Now allocate each match to each point and remove the allocated
     // point index from unmatched index vector
@@ -852,7 +852,7 @@ pcl::SequentialSVClustering<PointT>::getLabelsOfDynamicSV (SequentialSVMapT &sup
     { ++nb_occluded_voxels_by_labels[voxel.label_ - 1]; }
     ++nb_voxels_by_labels[voxel.label_ - 1];
   }
-  for(auto cluster: supervoxel_clusters)
+  for(const auto& cluster: supervoxel_clusters)
   {
     uint32_t i = cluster.first;
     // If the sv has disappeared or is fully occluded
@@ -860,6 +860,10 @@ pcl::SequentialSVClustering<PointT>::getLabelsOfDynamicSV (SequentialSVMapT &sup
        ( (nb_voxels_by_labels[i - 1] == nb_occluded_voxels_by_labels[i - 1]) && (supervoxel_clusters.find(i) != supervoxel_clusters.end()) ) )
     { labels_to_track.push_back(i); }
   }
+  // Fill the disappeared/occluded centroid map
+  centroid_of_dynamic_svs_.clear ();
+  for (const auto& label: labels_to_track)
+  { centroid_of_dynamic_svs_.push_back (supervoxel_clusters[label]->centroid_); }
   return (labels_to_track);
 }
 
@@ -1121,7 +1125,7 @@ pcl::SequentialSVClustering<PointT>::findInliers(const PointCloudFeatureT::Ptr &
       // supervoxel
       search.nearestKSearch((*all_cloud)[vec_it-all_indices.begin ()], 1, indices, distances);
       // If the NN of this point is close enough it's an inlier
-//      std::cout << "idx: " << vec_it-all_indices.begin () << " distance min: " << distances[0] << "\n";
+//      std::cout << "distance: " << distances[0] << "\n";
       if(distances[0] < threshold && distances[0] != 0.0)
       {
         *err += distances[0];
@@ -1147,13 +1151,13 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
   KeypointMapFeatureT previous_keypoints;
   KeypointFeatureT current_keypoints;
   // Parameters for sift computation
-  float min_scale = 0.001f;
-  float min_contrast = 0.1f;
+  float min_scale = 0.005f;
+  float min_contrast = 0.6f;
   // RANSAC variables
   int min_number_of_inliers = 3;
   float proba_of_pure_inlier = 0.99f;
   int num_max_iter = 100; // Same as in Van Hoof paper
-  float threshold = 50.f;
+  float threshold = 60.f;
   std::vector<uint32_t> labels;
 
   if(getMaxLabel() > 0)
@@ -1239,12 +1243,6 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
           new_centroid = transformation_est*prev_centroid;
           pcl::PointXYZ cent(new_centroid[0], new_centroid[1], new_centroid[2]);
 
-//          std::cout << "SV w/ label " << label << " was matched !\nThe found transform has "
-//                    << max_nb_of_inliers << " inliers\n";
-//          found_transforms.insert (std::pair<uint32_t, Eigen::Matrix<float, 4, 4>>
-//                                   (label, best_fit));
-//          labels.push_back(label);
-//          break;
           // Do radius search around new estimated centroid
           // This search is only based on spatiality in a radius of
           // seed_resolution (we are looking for the previous supervoxel)
@@ -2023,11 +2021,8 @@ pcl::SequentialSVClustering<PointT>::getColoredCloud () const
       }
       else
         std::cout <<"Could not find point in getColoredCloud!!!\n";
-
     }
-
   }
-
   return (colored_cloud);
 }
 
@@ -2175,7 +2170,7 @@ pcl::SequentialSVClustering<PointT>::setIgnoreInputNormals (bool val)
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> std::vector<uint32_t>
-pcl::SequentialSVClustering<PointT>::getLabelColors ()
+pcl::SequentialSVClustering<PointT>::getLabelColors () const
 {
   return (label_colors_);
 }

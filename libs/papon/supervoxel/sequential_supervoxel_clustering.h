@@ -112,13 +112,15 @@ namespace pcl
   {
       class SequentialSupervoxelHelper;
       friend class SequentialSupervoxelHelper;
+      friend class RansacSupervoxelTracker;
     public:
       std::unordered_map<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>> lines_;
       std::vector<int> previous_keypoints_indices_;
       std::vector<int> current_keypoints_indices_;
+      std::vector<pcl::PointXYZRGBA> centroid_of_dynamic_svs_;
 
       std::vector<uint32_t>
-      getLabelColors ();
+      getLabelColors () const;
 
       /** \brief VoxelData is a structure used for storing data within a pcl::octree::OctreePointCloudAdjacencyContainer
        *  \note It stores xyz, rgb, normal, distance, an index, and an owner.
