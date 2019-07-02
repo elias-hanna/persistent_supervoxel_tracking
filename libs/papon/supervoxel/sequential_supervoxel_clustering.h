@@ -241,19 +241,19 @@ namespace pcl
       typedef pcl::PointCloud<pcl::PointXYZI> PointCloudI;
 
       // Feature space search types
-//      typedef union FeatureT_
-//      {
-//          pcl::Histogram<32> rift32_descriptor;
-//          pcl::FPFHSignature33 fpfh33_descriptor;
-//      } FeatureT;
+      //      typedef union FeatureT_
+      //      {
+      //          pcl::Histogram<32> rift32_descriptor;
+      //          pcl::FPFHSignature33 fpfh33_descriptor;
+      //      } FeatureT;
 
-//      typedef pcl::Histogram<32> FeatureT;
+      //      typedef pcl::Histogram<32> FeatureT;
       typedef pcl::FPFHSignature33 FeatureT;
       typedef flann::L1<float> DistanceT; // Manhattan distance
-//      typedef flann::L2<float> DistanceT;
-//      typedef flann::KL_Divergence<float> DistanceT; // Kullback Leibler divergence ~= distance
-//      typedef flann::MinkowskiDistance<float> DistanceT;
-//      typedef flann::HistIntersectionDistance<float> DistanceT;
+      //      typedef flann::L2<float> DistanceT;
+      //      typedef flann::KL_Divergence<float> DistanceT; // Kullback Leibler divergence ~= distance
+      //      typedef flann::MinkowskiDistance<float> DistanceT;
+      //      typedef flann::HistIntersectionDistance<float> DistanceT;
       typedef pcl::PointCloud<FeatureT> PointCloudFeatureT;
       typedef std::pair<pcl::IndicesPtr, PointCloudFeatureT::Ptr> KeypointFeatureT;
       typedef std::unordered_map<uint32_t, KeypointFeatureT> KeypointMapFeatureT;
@@ -489,6 +489,11 @@ namespace pcl
       std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output>
       getMatches (SequentialSVMapT supervoxel_clusters);
 
+      /** \brief This methode removes the keypoints from current_keypoints given by the indices
+       * in to remove_indices */
+      void
+      removeInliers (KeypointFeatureT& current_keypoints, const std::vector<int>& to_remove_indices);
+
       /** \brief This method uses a RANSAC based algorithm to find matches to disappeared/occluded supervoxels from previous
        * frame that woud appear in the current frame
        * \param[out] matches found in the form of an STL unordered map with label as key and pcl::recognition::ObjRecRANSAC::Output as value
@@ -534,6 +539,21 @@ namespace pcl
                                               int min_nb_of_keypoints,
                                               float min_scale, float min_contrast,
                                               int n_octaves = 4, int n_scales_per_octave = 8);
+      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
+       * \note This overload compute keypoints and descriptors from the previous supervoxel clusters
+       * and stores it as a map linking the supervoxel label to a pair of indices (the keypoints in previous voxel cloud)
+       * and the corresponding descriptor cloud (FeatureT points) */
+      void
+      computeUniformKeypointsAndFPFHDescriptors(SequentialSVMapT &supervoxel_clusters,
+                                                KeypointMapFeatureT &previous_keypoints,
+                                                int min_nb_of_keypoints);
+      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
+       * \note This overload compute keypoints and descriptors from the current unlabeled voxel cloud
+       * and stores it as a pair of indices (the keypoints in previous voxel cloud)
+       * and the corresponding descriptor cloud (FeatureT points) */
+      void
+      computeUniformKeypointsAndFPFHDescriptors(KeypointFeatureT &current_keypoints,
+                                                int min_nb_of_keypoints);
       /** \brief This method randomly draws nb_to_sample points from indices (and removes them
        * from indices and cloud) and stores them accordingly in potential_inliers and
        * potential_inliers_feature_cloud. */

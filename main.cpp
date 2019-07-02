@@ -9,8 +9,13 @@
 #include "libs/papon/supervoxel/sequential_supervoxel_clustering.h"
 #include "libs/getter/getter.hpp"
 #include "libs/supervoxel_tracker/supervoxel_tracker.h"
+// Kinect2 includes
+#define WITH_PCL
+#include "libs/libfreenect2pclgrabber/include/k2g.h"
 // Macros
 #define N_DATA 2
+#define USE_KINECT 0
+#define KINECT_V2 0
 // Types
 typedef pcl::tracking::ParticleXYZRPY StateT;
 typedef pcl::PointXYZRGBA PointT;
@@ -190,9 +195,25 @@ main( int argc, char** argv )
   if (pcl::console::find_switch(argc, argv, "-t"))
     pcl::console::parse (argc, argv, "-t", time_pause_in_ms);
 
-  // OpenNIGrabber, used to capture pointclouds from various rgbd cameras
-  //  boost::shared_ptr<pcl::Grabber> grabber = boost::make_shared<pcl::OpenNIGrabber>();
-
+  /* Point clouds from Kinect */
+  // /!\ Empty constructor does nothing, need to call setGrabber
+  Getter<pcl::PointXYZRGBA> getter;
+  K2G k2g;
+  if (USE_KINECT)
+  {
+    if(KINECT_V2)
+    {
+      Processor freenectprocessor = OPENGL;
+      k2g.setProcessorAndStartRecording (freenectprocessor);
+    }
+    else
+    {
+      // OpenNIGrabber, used to capture pointclouds from various rgbd cameras
+      boost::shared_ptr<pcl::Grabber> grabber = boost::make_shared<pcl::OpenNIGrabber>();
+      // Getter Class to get the point cloud from various capturing devices
+      getter.setGrabber (grabber);
+    }
+  }
   // Pointcloud, used to store the cloud from the rgbd camera
   PointCloudT::Ptr cloud (new PointCloudT);
   // Tmp Pointcloud, used to store the cloud from the rgbd camera
@@ -220,9 +241,6 @@ main( int argc, char** argv )
     clouds.push_back(cloud);
   }
 
-  // Getter Class to get the point cloud from various capturing devices
-  //  Getter<pcl::PointXYZRGBA> getter( *grabber);
-
   // Create a supervoxel clustering instance
   pcl::SequentialSVClustering<PointT> super (voxel_resolution, seed_resolution);
 
@@ -237,7 +255,7 @@ main( int argc, char** argv )
 
   // Create a visualizer instance
   pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
-  viewer->setBackgroundColor (0, 0, 0);
+  viewer->setBackgroundColor (0/255., 0/255., 0/255.);
   viewer->initCameraParameters ();
   viewer->setCameraPosition(0,0,0, 0,0,1, 0,-1,0);
   viewer->registerKeyboardCallback(keyboardEventOccurred);
@@ -250,9 +268,17 @@ main( int argc, char** argv )
     cloud.reset (new PointCloudT);
     tmp_cloud.reset (new PointCloudT);
     // Get the cloud
-    //    copyPointCloud(getter.getCloud(), cloud);
-
-    copyPointCloud(*clouds[frame_count%N_DATA], *tmp_cloud);//cloud = clouds[i%N_DATA];
+    if (USE_KINECT)
+    {
+      if (KINECT_V2)
+      { copyPointCloud(*k2g.getCloud(), *tmp_cloud); }
+      else
+      { copyPointCloud(getter.getCloud(), *tmp_cloud); }
+    }
+    else
+    {
+      copyPointCloud(*clouds[frame_count%N_DATA], *tmp_cloud);//cloud = clouds[i%N_DATA];
+    }
     //    PointT pt1;
     //    pt1.x = -0.35;
     //    pt1.y = 0.5;
@@ -261,17 +287,17 @@ main( int argc, char** argv )
     //    pt2.x = 0.35;
     //    pt2.y = -0.25;
     //    pt2.z = 1.25 - 0.02;
-//    viewer->addLine (pt1, pt2, "test_line");
-//    viewer->addSphere(pt1, 0.005, 0, 255, 0, "start_test ");
-//    viewer->addSphere(pt2, 0.005, 255, 0, 0, "end_test ");
-//    float minX = -0.25; float minY = -0.25; float minZ = 1.;
-//    float maxX = 0.45; float maxY = 0.5; float maxZ = 1.5;
-//    pcl::CropBox<PointT> boxFilter;
-//    boxFilter.setMin(Eigen::Vector4f(minX, minY, minZ, 1.0));
-//    boxFilter.setMax(Eigen::Vector4f(maxX, maxY, maxZ, 1.0));
-//    boxFilter.setInputCloud(tmp_cloud);
-//    boxFilter.filter(*cloud);
-    copyPointCloud(*tmp_cloud, *cloud);//cloud = clouds[i%N_DATA];
+    //    viewer->addLine (pt1, pt2, "test_line");
+    //    viewer->addSphere(pt1, 0.005, 0, 255, 0, "start_test ");
+    //    viewer->addSphere(pt2, 0.005, 255, 0, 0, "end_test ");
+    float minX = -0.25; float minY = -0.25; float minZ = 0.9;
+    float maxX = 0.5; float maxY = 0.5; float maxZ = 1.5;
+    pcl::CropBox<PointT> boxFilter;
+    boxFilter.setMin(Eigen::Vector4f(minX, minY, minZ, 1.0));
+    boxFilter.setMax(Eigen::Vector4f(maxX, maxY, maxZ, 1.0));
+    boxFilter.setInputCloud(tmp_cloud);
+    boxFilter.filter(*cloud);
+//    copyPointCloud(*tmp_cloud, *cloud);//cloud = clouds[i%N_DATA];
 
     // If a cloud got captured from the device
     if(!cloud->empty())
@@ -299,6 +325,7 @@ main( int argc, char** argv )
       ++frame_count;
     }
   }
-
+  if (USE_KINECT && KINECT_V2)
+  { k2g.shutDown(); }
   return 0;
 }

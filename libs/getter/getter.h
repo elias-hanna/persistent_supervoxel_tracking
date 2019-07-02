@@ -10,18 +10,20 @@ class Getter
   typedef typename PointCloud::ConstPtr ConstPtr;
 
   private:
-    pcl::Grabber& grabber;
+    boost::shared_ptr<pcl::Grabber> grabber;
     boost::signals2::connection connection;
     boost::mutex mutex;
     pcl::PointCloud<PointType> buffer;
 
   public:
-    Getter(pcl::Grabber& grabber);
-    ~Getter();
-    pcl::PointCloud<PointType> getCloud();
+    Getter ();
+    Getter (boost::shared_ptr<pcl::Grabber> grabber);
+    ~Getter ();
+    pcl::PointCloud<PointType> setGrabber(boost::shared_ptr<pcl::Grabber> grabber);
+    pcl::PointCloud<PointType> getCloud ();
 
   private:
-    void cloud_callback(const ConstPtr& cloud);
+    void cloud_callback (const ConstPtr& cloud);
 };
 
 #endif

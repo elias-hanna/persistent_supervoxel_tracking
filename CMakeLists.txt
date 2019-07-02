@@ -43,6 +43,28 @@ endif ()
 ########################### TBB Library ##########################
 target_link_libraries(main tbb)
 
+######################### OpenCV Library #########################
+
+set(OpenCV_DIR "/home/elias-hanna/Documents/projects/opencv.OSID_ubuntu-16.04.installtree/lib/cmake/opencv4")
+find_package(OpenCV REQUIRED)
+target_include_directories(main PUBLIC ${OpenCV_INCLUDE_DIRS})
+target_link_libraries(main ${OpenCV_LIBS})
+
+########################### Kinect2 ##############################
+
+FIND_LIBRARY(freenect2_LIBRARY freenect2
+    PATHS /home/elias-hanna/freenect2/lib
+    NO_DEFAULT_PATH
+)
+SET(freenect2_LIBRARIES ${freenect2_LIBRARY} pthread)
+FIND_PATH(freenect2_INCLUDE_DIR libfreenect2/libfreenect2.hpp
+    PATHS /home/elias-hanna/freenect2/include
+    NO_DEFAULT_PATH
+)
+SET(freenect2_INCLUDE_DIRS ${freenect2_INCLUDE_DIR})
+target_include_directories(main PUBLIC ${freenect2_INCLUDE_DIRS})
+target_link_libraries (main ${freenect2_LIBRARIES})
+
 ########################### OpenMP Library ##########################
 # Recherche de la dépendance externe
 #find_package(OpenMP)
