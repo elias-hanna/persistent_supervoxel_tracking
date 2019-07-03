@@ -821,6 +821,92 @@ namespace pcl
       typedef boost::ptr_list<SequentialSupervoxelHelper> HelperListT;
       HelperListT supervoxel_helpers_;
 
+      class RANSACRegistration {
+          const KeypointFeatureT& current_keypoints_;
+          const KeypointMapFeatureT::value_type& pair_;
+          const int min_number_of_inliers_;
+          const SequentialSVMapT& supervoxel_clusters_;
+          const typename PointCloudT::Ptr prev_voxel_centroid_cloud_;
+          const typename PointCloudT::Ptr unlabeled_voxel_centroid_cloud_;
+          const typename PointCloudT::Ptr voxel_centroid_cloud_;
+          const float threshold_;
+          const float seed_resolution_;
+        public:
+          std::vector<int> best_inliers_set_;
+          float best_score_;
+          Eigen::Matrix<float, 4, 4> best_fit_;
+
+          void operator()( const tbb::blocked_range<size_t>& r );
+
+          RANSACRegistration( RANSACRegistration& x, tbb::split ):
+            current_keypoints_ (x.current_keypoints_),
+            pair_ (x.pair_),
+            min_number_of_inliers_ (x.min_number_of_inliers_),
+            supervoxel_clusters_ (x.supervoxel_clusters_),
+            prev_voxel_centroid_cloud_ (x.prev_voxel_centroid_cloud_),
+            unlabeled_voxel_centroid_cloud_ (x.unlabeled_voxel_centroid_cloud_),
+            voxel_centroid_cloud_ (x.voxel_centroid_cloud_),
+            threshold_ (x.threshold_),
+            seed_resolution_ (x.seed_resolution_),
+            best_score_ (0)
+          {}
+
+          void join( const RANSACRegistration& y )
+          {
+            if ( y.best_score_ > best_score_)
+            {
+              best_score_ = y.best_score_;
+              best_fit_ = y.best_fit_;
+              best_inliers_set_ = y.best_inliers_set_;
+            }
+          }
+
+          RANSACRegistration (const KeypointFeatureT& current_keypoints,
+                         const KeypointMapFeatureT::value_type& pair,
+                         const int min_number_of_inliers,
+                         const SequentialSVMapT& supervoxel_clusters,
+                         const typename PointCloudT::Ptr prev_voxel_centroid_cloud,
+                         const typename PointCloudT::Ptr unlabeled_voxel_centroid_cloud,
+                         const typename PointCloudT::Ptr voxel_centroid_cloud,
+                         const float threshold,
+                         const float seed_resolution):
+            current_keypoints_ (current_keypoints),
+            pair_ (pair),
+            min_number_of_inliers_ (min_number_of_inliers),
+            supervoxel_clusters_ (supervoxel_clusters),
+            prev_voxel_centroid_cloud_ (prev_voxel_centroid_cloud),
+            unlabeled_voxel_centroid_cloud_ (unlabeled_voxel_centroid_cloud),
+            voxel_centroid_cloud_ (voxel_centroid_cloud),
+            threshold_ (threshold),
+            seed_resolution_ (seed_resolution),
+            best_score_ (0)
+          {}
+
+        private:
+          void
+          samplePotentialInliers(std::vector<int> &indices,
+                                 PointCloudFeatureT::Ptr &cloud,
+                                 std::vector<int> &potential_inliers,
+                                 PointCloudFeatureT::Ptr &potential_inliers_feature_cloud,
+                                 int nb_to_sample);
+
+          Eigen::Matrix<float, 4, 4>
+          computeRigidTransformation(std::vector<int> prev_indices, std::vector<int> curr_indices);
+
+          void
+          findInliers(const PointCloudFeatureT::Ptr &search_cloud,
+                      const std::vector<int> &spatial_neighbors,
+                      const std::vector<int> &all_indices,
+                      const PointCloudFeatureT::Ptr &all_cloud,
+                      std::vector<int> &potential_inliers,
+                      PointCloudFeatureT::Ptr &potential_inliers_cloud,
+                      float threshold, float* err);
+
+          std::vector<int>
+          computeKeypointsMatches(const std::vector<int> to_match_indices, const PointCloudFeatureT to_match_feature_cloud,
+                                  const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > indices_point_pair);
+      };
+
     public:
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   };
