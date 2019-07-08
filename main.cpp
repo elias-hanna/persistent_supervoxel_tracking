@@ -70,6 +70,8 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer, const PointClou
   PointRGBLCloudT::Ptr rgb_labeled_voxel_cloud = super.getLabeledRGBVoxelCloud ();
   // Get the voxel normal cloud
   NormalCloud::Ptr voxel_normal_cloud = super.getVoxelNormalCloud ();
+  // Get the unlabeled voxel cloud
+  PointCloudT::Ptr un_voxel_centroid_cloud = super.getUnlabeledVoxelCentroidCloud ();
   // Show the labeled observed pointcloud
   if (show_labels)
   {
@@ -79,7 +81,7 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer, const PointClou
   // Show the observed pointcloud
   else
   {
-    pcl::visualization::PointCloudColorHandlerRGBAField<PointT> rgba(cloud);
+    pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgba(cloud);
     if (!viewer->updatePointCloud<PointT> (cloud, rgba, "displayed cloud"))
     { viewer->addPointCloud<PointT> (cloud, rgba, "displayed cloud"); }
   }
@@ -127,12 +129,14 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer, const PointClou
         double r = static_cast<double> (static_cast<uint8_t> (color >> 16));
         double g = static_cast<double> (static_cast<uint8_t> (color >> 8));
         double b = static_cast<double> (static_cast<uint8_t> (color));
+//        std::cout << "label: " << line.first << " r: " << r << " g: " << g
+//                  << " b: " << b << "\n";
         PointT pt1; PointT pt2;
         pt1.x = line.second.first[0]; pt2.x = line.second.second[0];
         pt1.y = line.second.first[1]; pt2.y = line.second.second[1];
         pt1.z = line.second.first[2]; pt2.z = line.second.second[2];
 
-        viewer->addLine (pt1, pt2, r/255, g/255, b/255, std::to_string (line.first));
+        viewer->addLine (pt1, pt2, r/255., g/255., b/255., std::to_string (line.first));
 
         viewer->addSphere(pt1, 0.005, 0, 255, 0, "start " + std::to_string (line.first));
         viewer->addSphere(pt2, 0.005, 255, 0, 0, "end " + std::to_string (line.first));
@@ -290,8 +294,8 @@ main( int argc, char** argv )
     //    viewer->addLine (pt1, pt2, "test_line");
     //    viewer->addSphere(pt1, 0.005, 0, 255, 0, "start_test ");
     //    viewer->addSphere(pt2, 0.005, 255, 0, 0, "end_test ");
-    float minX = -0.25; float minY = -0.25; float minZ = 0.9;
-    float maxX = 0.5; float maxY = 0.5; float maxZ = 1.5;
+    float minX = -0.4; float minY = -0.25; float minZ = 0.9;
+    float maxX = 0.5; float maxY = 0.5; float maxZ = 1.55;
     pcl::CropBox<PointT> boxFilter;
     boxFilter.setMin(Eigen::Vector4f(minX, minY, minZ, 1.0));
     boxFilter.setMax(Eigen::Vector4f(maxX, maxY, maxZ, 1.0));

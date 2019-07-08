@@ -4,26 +4,32 @@
 #include "getter.h"
 
 template <typename PointType>
-Getter<PointType>::Getter ()
+Getter<PointType>::Getter ():
+  started_ (false)
 {
 }
 
 template <typename PointType>
-Getter<PointType>::Getter (boost::shared_ptr<pcl::Grabber>): grabber(grabber)
+Getter<PointType>::Getter (boost::shared_ptr<pcl::Grabber>):
+  grabber_(grabber_),
+  started_(true)
 {
   boost::function<void (const ConstPtr&)> callback = boost::bind(&Getter::cloud_callback, this, _1);
-  connection = grabber->registerCallback(callback);
-  grabber->start();
+  connection_ = grabber_->registerCallback(callback);
+  grabber_->start();
 }
 
 template <typename PointType>
 Getter<PointType>::~Getter ()
 {
-  grabber->stop();
-
-  if(connection.connected())
+  if (started_)
   {
-    connection.disconnect();
+    grabber_->stop();
+
+    if(connection_.connected())
+    {
+      connection_.disconnect();
+    }
   }
 }
 
@@ -31,20 +37,21 @@ template <typename PointType> pcl::PointCloud<PointType>
 Getter<PointType>::setGrabber (boost::shared_ptr<pcl::Grabber>)
 {
   boost::function<void (const ConstPtr&)> callback = boost::bind(&Getter::cloud_callback, this, _1);
-  connection = grabber->registerCallback(callback);
-  grabber->start();
+  connection_ = grabber_->registerCallback(callback);
+  grabber_->start();
+  started_ = true;
 }
 
 template <typename PointType> pcl::PointCloud<PointType>
 Getter<PointType>::getCloud ()
 {
-  return buffer;
+  return buffer_;
 }
 
 template <typename PointType> void
 Getter<PointType>::cloud_callback (const ConstPtr& cloud)
 {  
-  buffer = *cloud;
+  buffer_ = *cloud;
 }
 
 #endif
