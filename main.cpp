@@ -39,6 +39,7 @@ static bool show_curr = false;
 static bool show_labels = false;
 static bool show_disappeared = false;
 static bool show_transforms = false;
+static bool show_unlabeled = false;
 static uint64_t frame_count = 0;
 
 void
@@ -52,9 +53,11 @@ keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event)
   if (event.getKeySym () == "KP_3" && event.keyDown ())
   { show_labels = !show_labels; }
   if (event.getKeySym () == "KP_4" && event.keyDown ())
-  { show_disappeared = !show_disappeared; }
-  if (event.getKeySym () == "KP_5" && event.keyDown ())
   { show_transforms = !show_transforms; }
+  if (event.getKeySym () == "KP_5" && event.keyDown ())
+  { show_unlabeled = !show_unlabeled; }
+  if (event.getKeySym () == "KP_6" && event.keyDown ())
+  { show_disappeared = !show_disappeared; }
   if (event.getKeySym () == "Return" && event.keyDown ())
   { manual_mode = false; }
 }
@@ -85,13 +88,20 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer, const PointClou
     if (!viewer->updatePointCloud<PointT> (cloud, rgba, "displayed cloud"))
     { viewer->addPointCloud<PointT> (cloud, rgba, "displayed cloud"); }
   }
+  if (show_unlabeled)
+  {
+    pcl::visualization::PointCloudColorHandlerCustom<PointT> rgb (un_voxel_centroid_cloud, 0, 255, 0); //This is blue
+    if (!viewer->updatePointCloud<PointT> (cloud, rgb, "unlabeled cloud"))
+    { viewer->addPointCloud<PointT> (un_voxel_centroid_cloud, rgb, "unlabeled cloud"); }
+  }
   viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,1., "displayed cloud");
 
   viewer->addText ("press NUM1 to show/hide previous keypoints",0, 0, "t_prev");
   viewer->addText ("press NUM2 to show/hide current keypoints",0, 10, "t_curr");
   viewer->addText ("press NUM3 to switch between labelized/normal view of cloud",0, 20, "t_cloud");
-  viewer->addText ("press NUM4 to show/hide text over disappeared/occluded supervoxels",0, 30, "t_dis");
-  viewer->addText ("press NUM5 to show/hide the computed transforms",0, 40, "t_trans");
+  viewer->addText ("press NUM4 to show/hide the computed transforms",0, 30, "t_trans");
+  viewer->addText ("press NUM5 to show/hide the unlabeled voxel centroid cloud",0, 40, "t_unlabeled");
+  viewer->addText ("press NUM6 to show/hide points at the center of disappeared/occluded supervoxels",0, 50, "t_dis");
   if (manual_mode)
   { viewer->addText ("press Enter to go to next frame",700, 0, 20, 1., 1., 1., "t_manual"); }
   std::vector<int> current_keypoints_indices = super.current_keypoints_indices_;
@@ -129,8 +139,8 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer, const PointClou
         double r = static_cast<double> (static_cast<uint8_t> (color >> 16));
         double g = static_cast<double> (static_cast<uint8_t> (color >> 8));
         double b = static_cast<double> (static_cast<uint8_t> (color));
-//        std::cout << "label: " << line.first << " r: " << r << " g: " << g
-//                  << " b: " << b << "\n";
+        //        std::cout << "label: " << line.first << " r: " << r << " g: " << g
+        //                  << " b: " << b << "\n";
         PointT pt1; PointT pt2;
         pt1.x = line.second.first[0]; pt2.x = line.second.second[0];
         pt1.y = line.second.first[1]; pt2.y = line.second.second[1];

@@ -265,6 +265,22 @@ pcl::SequentialSVClustering<PointT>::updatePrevClouds ()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
+pcl::SequentialSVClustering<PointT>::updateUnlabeledNormalCloud (const IndicesConstPtr indices)
+{
+  if (indices->size () > 0)
+  {
+    pcl::PointIndices::Ptr point_indices(new pcl::PointIndices());
+    pcl::ExtractIndices<Normal> extract;
+    point_indices->indices = *indices;
+    extract.setInputCloud(unlabeled_voxel_centroid_normal_cloud_);
+    extract.setIndices(point_indices);
+    extract.setNegative(true);
+    extract.filter(*unlabeled_voxel_centroid_normal_cloud_);
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::computeVoxelData ()
 {
 
@@ -328,20 +344,20 @@ pcl::SequentialSVClustering<PointT>::computeVoxelData ()
   {
     parallelComputeNormals ();
   }
-  PointIndices filtered_indices;
-
-  //  // Filter noise from unlabeled voxel centroid cloud
-//  typename PointCloudT::Ptr tmp_cloud(new PointCloudT);
-//  pcl::StatisticalOutlierRemoval<PointT> sor;
-//  sor.setInputCloud (unlabeled_voxel_centroid_cloud_);
-//  sor.setMeanK (50);
-//  sor.setStddevMulThresh (0.01);
-//  sor.filter (*tmp_cloud);
-//  unlabeled_voxel_centroid_cloud_.reset (new PointCloudT);
-//  unlabeled_voxel_centroid_cloud_->resize (tmp_cloud->size ());
-//  copyPointCloud(*tmp_cloud, *unlabeled_voxel_centroid_cloud_);
-//  sor.getRemovedIndices (filtered_indices);
-  computeUnlabeledVoxelCentroidNormalCloud (filtered_indices);
+  IndicesConstPtr filtered_indices (new std::vector<int>);
+  // Filter noise from unlabeled voxel centroid cloud
+  typename PointCloudT::Ptr tmp_cloud(new PointCloudT);
+  pcl::StatisticalOutlierRemoval<PointT> sor (true);
+  sor.setInputCloud (unlabeled_voxel_centroid_cloud_);
+  sor.setMeanK (50);
+  sor.setStddevMulThresh (0.001);
+  sor.filter (*tmp_cloud);
+  unlabeled_voxel_centroid_cloud_.reset (new PointCloudT);
+  unlabeled_voxel_centroid_cloud_->resize (tmp_cloud->size ());
+  copyPointCloud(*tmp_cloud, *unlabeled_voxel_centroid_cloud_);
+  //  sor.getRemovedIndices (filtered_indices);
+  filtered_indices = sor.getRemovedIndices ();
+  updateUnlabeledNormalCloud (filtered_indices);
   //Update kdtree now that we have updated centroid cloud
   voxel_kdtree_.reset (new pcl::search::KdTree<PointT>);
   voxel_kdtree_->setInputCloud (voxel_centroid_cloud_);
@@ -827,7 +843,7 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors(S
   {
     PointCloudScale::Ptr keypoints (new PointCloudScale);
 
-    pcl::octree::OctreePointCloudSearch <PointT> seed_octree (3 * resolution_);
+    pcl::octree::OctreePointCloudSearch <PointT> seed_octree (2 * resolution_);
     seed_octree.setInputCloud (supervoxel_clusters[label]->voxels_/*unlabeled_voxel_centroid_cloud_*/);
     seed_octree.addPointsFromInputCloud ();
     // std::cout << "Size of octree ="<<seed_octree.getLeafCount ()<<"\n";
@@ -862,7 +878,7 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors(K
 {
   // Initiliaze the SIFT keypoints structure
   PointCloudScale::Ptr keypoints (new PointCloudScale);
-  pcl::octree::OctreePointCloudSearch <PointT> seed_octree (3 * resolution_);
+  pcl::octree::OctreePointCloudSearch <PointT> seed_octree (2 * resolution_);
   seed_octree.setInputCloud (unlabeled_voxel_centroid_cloud_/*unlabeled_voxel_centroid_cloud_*/);
   seed_octree.addPointsFromInputCloud ();
   // std::cout << "Size of octree ="<<seed_octree.getLeafCount ()<<"\n";
@@ -1457,7 +1473,7 @@ pcl::SequentialSVClustering<PointT>::RANSACRegistration::findInliers(const Point
   SearchT search (true, CreatorPtrT (new IndexT (4)));
   search.setPointRepresentation (RepresentationPtrT (new DefaultFeatureRepresentation<FeatureT>));
   search.setChecks (256);
-//  pcl::search::KdTree<FeatureT> search;
+  //  pcl::search::KdTree<FeatureT> search;
   search.setInputCloud (search_cloud);
   for(auto neigh_ind: spatial_neighbors)
   {
@@ -1497,7 +1513,7 @@ pcl::SequentialSVClustering<PointT>::RANSACRegistration::computeKeypointsMatches
   SearchT search (true, CreatorPtrT (new IndexT (4)));
   search.setPointRepresentation (RepresentationPtrT (new DefaultFeatureRepresentation<FeatureT>));
   search.setChecks (256);
-//  pcl::search::KdTree<FeatureT> search;
+  //  pcl::search::KdTree<FeatureT> search;
   search.setInputCloud (indices_point_pair.second);
   // Create a vector that contains -1
   std::vector<int> matches_of_to_match(to_match_indices.size (), -1);
@@ -1565,25 +1581,25 @@ pcl::SequentialSVClustering<PointT>::RANSACRegistration::operator() (const tbb::
   for( size_t i=r.begin(); i!=r.end(); ++i )
   {
     // Temporary structures that store copies from current keypoints data
-//    std::vector<int> tmp_indices = *current_keypoints_.first;
-//    PointCloudFeatureT::Ptr tmp_cloud (new PointCloudFeatureT);
-//    copyPointCloud (*current_keypoints_.second, *tmp_cloud);
-//    // Structures that store potential inliers data
-//    std::vector<int> maybe_inliers;
-//    maybe_inliers.reserve (min_number_of_inliers_);
-//    PointCloudFeatureT::Ptr maybe_inliers_feature_cloud (new PointCloud<FeatureT>);
-//    // Draw min_number_of_inliers samples from the observed keypoint cloud
-//    samplePotentialInliers(tmp_indices, tmp_cloud, maybe_inliers, maybe_inliers_feature_cloud, min_number_of_inliers_);
-//    // Compute keypoints matches with maybe inliers
-//    std::vector<int> matches_of_maybe_inliers = computeKeypointsMatches(maybe_inliers, *maybe_inliers_feature_cloud,
-//                                                                        pair_.second);
-//    // Compute the transform between the points sampled from data and the previous keypoints
-//    Eigen::Matrix<float, 4, 4> transformation_est = computeRigidTransformation(matches_of_maybe_inliers, maybe_inliers);
-//    // Compute the new transformed centroid of the current supervoxel being matched
-//    pcl::PointXYZRGBA prev_centroid_tmp = supervoxel_clusters_.at (pair_.first)->centroid_;
-//    Eigen::Vector4f new_centroid, prev_centroid(prev_centroid_tmp.x, prev_centroid_tmp.y, prev_centroid_tmp.z, 1);
-//    new_centroid = transformation_est*prev_centroid;
-//    pcl::PointXYZ cent(new_centroid[0], new_centroid[1], new_centroid[2]);
+    //    std::vector<int> tmp_indices = *current_keypoints_.first;
+    //    PointCloudFeatureT::Ptr tmp_cloud (new PointCloudFeatureT);
+    //    copyPointCloud (*current_keypoints_.second, *tmp_cloud);
+    //    // Structures that store potential inliers data
+    //    std::vector<int> maybe_inliers;
+    //    maybe_inliers.reserve (min_number_of_inliers_);
+    //    PointCloudFeatureT::Ptr maybe_inliers_feature_cloud (new PointCloud<FeatureT>);
+    //    // Draw min_number_of_inliers samples from the observed keypoint cloud
+    //    samplePotentialInliers(tmp_indices, tmp_cloud, maybe_inliers, maybe_inliers_feature_cloud, min_number_of_inliers_);
+    //    // Compute keypoints matches with maybe inliers
+    //    std::vector<int> matches_of_maybe_inliers = computeKeypointsMatches(maybe_inliers, *maybe_inliers_feature_cloud,
+    //                                                                        pair_.second);
+    //    // Compute the transform between the points sampled from data and the previous keypoints
+    //    Eigen::Matrix<float, 4, 4> transformation_est = computeRigidTransformation(matches_of_maybe_inliers, maybe_inliers);
+    //    // Compute the new transformed centroid of the current supervoxel being matched
+    //    pcl::PointXYZRGBA prev_centroid_tmp = supervoxel_clusters_.at (pair_.first)->centroid_;
+    //    Eigen::Vector4f new_centroid, prev_centroid(prev_centroid_tmp.x, prev_centroid_tmp.y, prev_centroid_tmp.z, 1);
+    //    new_centroid = transformation_est*prev_centroid;
+    //    pcl::PointXYZ cent(new_centroid[0], new_centroid[1], new_centroid[2]);
 
     std::vector<int> tmp_indices = *current_keypoints_.first;
     PointCloudFeatureT::Ptr tmp_cloud (new PointCloudFeatureT);
@@ -1903,37 +1919,6 @@ pcl::SequentialSVClustering<PointT>::getUnlabeledVoxelNormalCloud () const
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::computeUnlabeledVoxelCentroidNormalCloud (const PointIndices point_indices)
-{
-  unlabeled_voxel_centroid_normal_cloud_.reset (new NormalCloud);
-  unlabeled_voxel_centroid_normal_cloud_->resize(unlabeled_voxel_centroid_cloud_->size ());
-  NormalCloud::iterator normal_cloud_itr = unlabeled_voxel_centroid_normal_cloud_->begin();
-  typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
-  std::vector<int>::const_iterator point_indices_itr = point_indices.indices.begin ();
-  int idx = 0;
-  for (; leaf_itr != sequential_octree_->end (); ++leaf_itr)
-  {
-    SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
-    if(point_indices.indices.size () > 0)
-    {
-      if (new_voxel_data.label_ == -1 && idx != *point_indices_itr)
-      {
-        // Add the point to the normal cloud
-        new_voxel_data.getNormal (*normal_cloud_itr);
-        ++normal_cloud_itr;
-      }
-      else if (new_voxel_data.label_ == -1)
-      { ++point_indices_itr; }
-    }
-    else if (new_voxel_data.label_ == -1)
-    {
-      new_voxel_data.getNormal (*normal_cloud_itr);
-      ++normal_cloud_itr;
-    }
-  }
-}
-
 template <typename PointT> pcl::PointCloud<pcl::PointXYZRGBA>::Ptr
 pcl::SequentialSVClustering<PointT>::getColoredVoxelCloud () const
 {
@@ -1954,7 +1939,6 @@ pcl::SequentialSVClustering<PointT>::getColoredVoxelCloud () const
 
   return (colored_cloud);
 }
-
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> pcl::PointCloud<pcl::PointXYZRGBA>::Ptr

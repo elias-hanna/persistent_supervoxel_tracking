@@ -392,10 +392,6 @@ namespace pcl
       pcl::PointCloud<pcl::Normal>::Ptr
       getUnlabeledVoxelNormalCloud () const;
 
-      /** \brief Compute the attribute unlabeled_voxel_centroid_normal_cloud_ */
-      void
-      computeUnlabeledVoxelCentroidNormalCloud (const PointIndices point_indices);
-
       /** \brief Gets the adjacency list (Boost Graph library) which gives connections between supervoxels
        *  \param[out] adjacency_list_arg BGL graph where supervoxel labels are vertices, edges are touching relationships
        */
@@ -588,6 +584,10 @@ namespace pcl
       /** \brief Compute the voxel data (index of each voxel in the octree and normal of each voxel) */
       void
       updatePrevClouds ();
+
+      /** \brief Update the unlabeled normal cloud by removing the indices given by indices */
+      void
+      updateUnlabeledNormalCloud (const IndicesConstPtr indices);
 
       /** \brief This method compute the normal of each leaf belonging to the sequential octree
        */
