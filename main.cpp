@@ -9,13 +9,14 @@
 #include "libs/papon/supervoxel/sequential_supervoxel_clustering.h"
 #include "libs/getter/getter.hpp"
 #include "libs/supervoxel_tracker/supervoxel_tracker.h"
+#include "libs/pairwise_segmentation/pairwise_segmentation.h"
 // Kinect2 includes
 #define WITH_PCL
 #include "libs/libfreenect2pclgrabber/include/k2g.h"
 // Macros
 #define N_DATA 2
-#define USE_KINECT 0
-#define KINECT_V2 0
+#define USE_KINECT 1
+#define KINECT_V2 1
 // Types
 typedef pcl::tracking::ParticleXYZRPY StateT;
 typedef pcl::PointXYZRGBA PointT;
@@ -37,6 +38,7 @@ static bool manual_mode = false;
 static bool show_prev = false;
 static bool show_curr = false;
 static bool show_labels = false;
+static bool show_segmentation = false;
 static bool show_disappeared = false;
 static bool show_transforms = false;
 static bool show_unlabeled = false;
@@ -58,50 +60,90 @@ keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event)
   { show_unlabeled = !show_unlabeled; }
   if (event.getKeySym () == "KP_6" && event.keyDown ())
   { show_disappeared = !show_disappeared; }
+  if (event.getKeySym () == "KP_7" && event.keyDown ())
+  { show_segmentation = !show_segmentation; }
   if (event.getKeySym () == "Return" && event.keyDown ())
   { manual_mode = false; }
 }
 
 void
-updateView (const pcl::visualization::PCLVisualizer::Ptr viewer, const PointCloudT::Ptr cloud, const pcl::SequentialSVClustering<PointT>& super)
+updateView (const pcl::visualization::PCLVisualizer::Ptr viewer,
+            const PointCloudT::Ptr cloud,
+            const pcl::SequentialSVClustering<PointT>& super,
+            const pcl::SequentialSVClustering<PointT>::SequentialSVMapT supervoxel_clusters,
+            const PairwiseSegmentation pw_seg)
 {
   // Get the voxel centroid cloud
   PointCloudT::Ptr voxel_centroid_cloud = super.getVoxelCentroidCloud ();
   // Get the labeled voxel cloud
   PointLCloudT::Ptr labeled_voxel_cloud = super.getLabeledVoxelCloud ();
   // Get the labeled voxel cloud
-  PointRGBLCloudT::Ptr rgb_labeled_voxel_cloud = super.getLabeledRGBVoxelCloud ();
+  PointRGBLCloudT::Ptr
+      rgb_labeled_voxel_cloud = super.getLabeledRGBVoxelCloud ();
   // Get the voxel normal cloud
-  NormalCloud::Ptr voxel_normal_cloud = super.getVoxelNormalCloud ();
+  NormalCloud::Ptr
+      voxel_normal_cloud = super.getVoxelNormalCloud ();
   // Get the unlabeled voxel cloud
-  PointCloudT::Ptr un_voxel_centroid_cloud = super.getUnlabeledVoxelCentroidCloud ();
+  PointCloudT::Ptr
+      un_voxel_centroid_cloud = super.getUnlabeledVoxelCentroidCloud ();
   // Show the labeled observed pointcloud
-  if (show_labels)
+  if (show_labels && !show_segmentation)
   {
     if (!viewer->updatePointCloud (labeled_voxel_cloud, "displayed cloud"))
     { viewer->addPointCloud (labeled_voxel_cloud, "displayed cloud"); }
   }
   // Show the observed pointcloud
-  else
+  else if (!show_segmentation)
   {
     pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgba(cloud);
     if (!viewer->updatePointCloud<PointT> (cloud, rgba, "displayed cloud"))
     { viewer->addPointCloud<PointT> (cloud, rgba, "displayed cloud"); }
   }
+  // Show the segmentation
+  else
+  {
+    pcl::GlasbeyLUT colors;
+    for (const auto& sv: supervoxel_clusters)
+    {
+      size_t obj_nb = 0;
+      // Find to which object this sv corresponds
+      for (const auto& obj: pw_seg.getCurrentSegmentation ())
+      {
+        std::vector<uint32_t>::const_iterator vec_it =
+            std::find (obj.second.begin (), obj.second.end (), sv.first);
+        if (vec_it != obj.second.end ())
+        { obj_nb = obj.first; break; }
+      }
+      pcl::visualization::PointCloudColorHandlerCustom<PointT>
+          rgb (sv.second->voxels_,
+               colors.at(obj_nb).r, colors.at(obj_nb).g, colors.at(obj_nb).b);
+      viewer->addPointCloud<PointT> (sv.second->voxels_, rgb,
+                                     "sv_"+std::to_string (sv.first));
+    }
+  }
   if (show_unlabeled)
   {
-    pcl::visualization::PointCloudColorHandlerCustom<PointT> rgb (un_voxel_centroid_cloud, 0, 255, 0); //This is blue
+    pcl::visualization::PointCloudColorHandlerCustom<PointT>
+        rgb (un_voxel_centroid_cloud, 0, 255, 0); //This is blue
     if (!viewer->updatePointCloud<PointT> (cloud, rgb, "unlabeled cloud"))
-    { viewer->addPointCloud<PointT> (un_voxel_centroid_cloud, rgb, "unlabeled cloud"); }
+    {
+      viewer->addPointCloud<PointT>
+          (un_voxel_centroid_cloud, rgb, "unlabeled cloud");
+    }
+    //    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10, "unlabeled cloud");
   }
-  viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_OPACITY,1., "displayed cloud");
-
+  if (!show_segmentation)
+  {
+    viewer->setPointCloudRenderingProperties
+        (pcl::visualization::PCL_VISUALIZER_OPACITY,1., "displayed cloud");
+  }
   viewer->addText ("press NUM1 to show/hide previous keypoints",0, 0, "t_prev");
   viewer->addText ("press NUM2 to show/hide current keypoints",0, 10, "t_curr");
   viewer->addText ("press NUM3 to switch between labelized/normal view of cloud",0, 20, "t_cloud");
   viewer->addText ("press NUM4 to show/hide the computed transforms",0, 30, "t_trans");
   viewer->addText ("press NUM5 to show/hide the unlabeled voxel centroid cloud",0, 40, "t_unlabeled");
   viewer->addText ("press NUM6 to show/hide points at the center of disappeared/occluded supervoxels",0, 50, "t_dis");
+  viewer->addText ("press NUM7 to show the current segmentation w/ pairwise approach",0, 60, "t_seg");
   if (manual_mode)
   { viewer->addText ("press Enter to go to next frame",700, 0, 20, 1., 1., 1., "t_manual"); }
   std::vector<int> current_keypoints_indices = super.current_keypoints_indices_;
@@ -113,8 +155,13 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer, const PointClou
     {
       for (const auto& idx: super.current_keypoints_indices_)
       {
-        if (!viewer->updateSphere((*voxel_centroid_cloud)[idx], 0.002, 125, 125, 0, "current keypoint " + std::to_string (idx)))
-        { viewer->addSphere((*voxel_centroid_cloud)[idx], 0.002, 125, 125, 0, "current keypoint " + std::to_string (idx)); }
+        if (!viewer->updateSphere((*voxel_centroid_cloud)[idx],
+                                  0.002, 125, 125, 0,
+                                  "current keypoint " + std::to_string (idx)))
+        {
+          viewer->addSphere((*voxel_centroid_cloud)[idx],
+                            0.002, 125, 125, 0,
+                            "current keypoint " + std::to_string (idx)); }
       }
     }
     // Show previous keypoint cloud
@@ -124,14 +171,20 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer, const PointClou
       PointCloudT::Ptr prev_voxel_centroid_cloud = super.getPrevVoxelCentroidCloud ();
       for (const auto& idx: super.previous_keypoints_indices_)
       {
-        if (!viewer->updateSphere((*prev_voxel_centroid_cloud)[idx], 0.002, 0, 0, 255, "previous keypoint " + std::to_string (idx)))
-        { viewer->addSphere((*prev_voxel_centroid_cloud)[idx], 0.002, 0, 0, 255, "previous keypoint " + std::to_string (idx)); }
+        if (!viewer->updateSphere((*prev_voxel_centroid_cloud)[idx],
+                                  0.002, 0, 0, 255,
+                                  "previous keypoint " + std::to_string (idx)))
+        {
+          viewer->addSphere((*prev_voxel_centroid_cloud)[idx],
+                            0.002, 0, 0, 255,
+                            "previous keypoint " + std::to_string (idx)); }
       }
     }
     // Show the transforms that were computed
     if (show_transforms)
     {
-      std::unordered_map<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>> lines = super.lines_;
+      std::unordered_map<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>>
+          lines = super.lines_;
       std::vector<uint32_t> label_color = super.getLabelColors ();
       for (const auto& line: super.lines_)
       {
@@ -139,17 +192,18 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer, const PointClou
         double r = static_cast<double> (static_cast<uint8_t> (color >> 16));
         double g = static_cast<double> (static_cast<uint8_t> (color >> 8));
         double b = static_cast<double> (static_cast<uint8_t> (color));
-        //        std::cout << "label: " << line.first << " r: " << r << " g: " << g
-        //                  << " b: " << b << "\n";
         PointT pt1; PointT pt2;
         pt1.x = line.second.first[0]; pt2.x = line.second.second[0];
         pt1.y = line.second.first[1]; pt2.y = line.second.second[1];
         pt1.z = line.second.first[2]; pt2.z = line.second.second[2];
 
-        viewer->addLine (pt1, pt2, r/255., g/255., b/255., std::to_string (line.first));
+        viewer->addLine (pt1, pt2, r/255., g/255., b/255.,
+                         std::to_string (line.first));
 
-        viewer->addSphere(pt1, 0.005, 0, 255, 0, "start " + std::to_string (line.first));
-        viewer->addSphere(pt2, 0.005, 255, 0, 0, "end " + std::to_string (line.first));
+        viewer->addSphere(pt1, 0.005, 0, 255, 0, "start "
+                          + std::to_string (line.first));
+        viewer->addSphere(pt2, 0.005, 255, 0, 0, "end "
+                          + std::to_string (line.first));
       }
     }
     // Show white sphere over disappeared/occluded supervoxels
@@ -158,8 +212,10 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer, const PointClou
       int count = 0;
       for (const auto& centroid: super.centroid_of_dynamic_svs_)
       {
-        if (!viewer->updateSphere(centroid, 0.002, 1., 1., 1., "to_track_" + std::to_string (count)))
-        { viewer->addSphere(centroid, 0.002, 1., 1., 1., "to_track_" + std::to_string (count)); ++count; }
+        if (!viewer->updateSphere(centroid, 0.002, 1., 1., 1., "to_track_"
+                                  + std::to_string (count)))
+        { viewer->addSphere(centroid, 0.002, 1., 1., 1., "to_track_"
+                            + std::to_string (count)); ++count; }
       }
     }
   }
@@ -168,7 +224,8 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer, const PointClou
 int 
 main( int argc, char** argv )
 {
-  bool help_asked = pcl::console::find_switch (argc, argv, "-h") || pcl::console::find_switch (argc, argv, "--help");
+  bool help_asked = pcl::console::find_switch (argc, argv, "-h")
+      || pcl::console::find_switch (argc, argv, "--help");
 
   if(help_asked)
   {
@@ -219,11 +276,13 @@ main( int argc, char** argv )
     {
       Processor freenectprocessor = OPENGL;
       k2g.setProcessorAndStartRecording (freenectprocessor);
+      k2g.disableLog ();
     }
     else
     {
       // OpenNIGrabber, used to capture pointclouds from various rgbd cameras
-      boost::shared_ptr<pcl::Grabber> grabber = boost::make_shared<pcl::OpenNIGrabber>();
+      boost::shared_ptr<pcl::Grabber>
+          grabber = boost::make_shared<pcl::OpenNIGrabber>();
       // Getter Class to get the point cloud from various capturing devices
       getter.setGrabber (grabber);
     }
@@ -246,10 +305,12 @@ main( int argc, char** argv )
     PointCloudT::Ptr cloud(new PointCloudT);
     //    std::string path = "../data/test" + std::to_string(i) + ".pcd";
     std::string path = "../data/example_" + std::to_string(i) + ".pcd";
-    pcl::console::print_highlight (("Loading point cloud" + std::to_string(i) + "...\n").c_str());
+    pcl::console::print_highlight (("Loading point cloud" + std::to_string(i) +
+                                    "...\n").c_str());
     if (pcl::io::loadPCDFile<PointT> (path, *cloud))
     {
-      pcl::console::print_error (("Error loading cloud" + std::to_string(i) + " file!\n").c_str());
+      pcl::console::print_error (("Error loading cloud" + std::to_string(i) +
+                                  " file!\n").c_str());
       return (1);
     }
     clouds.push_back(cloud);
@@ -268,11 +329,15 @@ main( int argc, char** argv )
   //  std::map <uint32_t, pcl::SequentialSV<PointT>::Ptr > supervoxel_clusters;
 
   // Create a visualizer instance
-  pcl::visualization::PCLVisualizer::Ptr viewer (new pcl::visualization::PCLVisualizer ("3D Viewer"));
+  pcl::visualization::PCLVisualizer::Ptr viewer
+      (new pcl::visualization::PCLVisualizer ("3D Viewer"));
   viewer->setBackgroundColor (0/255., 0/255., 0/255.);
   viewer->initCameraParameters ();
   viewer->setCameraPosition(0,0,0, 0,0,1, 0,-1,0);
   viewer->registerKeyboardCallback(keyboardEventOccurred);
+
+  // Create a pairwise segmentation instance
+  PairwiseSegmentation pw_seg;
 
   while(!viewer->wasStopped ())
   {
@@ -291,7 +356,7 @@ main( int argc, char** argv )
     }
     else
     {
-      copyPointCloud(*clouds[frame_count%N_DATA], *tmp_cloud);//cloud = clouds[i%N_DATA];
+      copyPointCloud(*clouds[frame_count%N_DATA], *tmp_cloud);
     }
     //    PointT pt1;
     //    pt1.x = -0.35;
@@ -311,7 +376,7 @@ main( int argc, char** argv )
     boxFilter.setMax(Eigen::Vector4f(maxX, maxY, maxZ, 1.0));
     boxFilter.setInputCloud(tmp_cloud);
     boxFilter.filter(*cloud);
-//    copyPointCloud(*tmp_cloud, *cloud);//cloud = clouds[i%N_DATA];
+    //    copyPointCloud(*tmp_cloud, *cloud);//cloud = clouds[i%N_DATA];
 
     // If a cloud got captured from the device
     if(!cloud->empty())
@@ -323,15 +388,32 @@ main( int argc, char** argv )
 
       super.extract (supervoxel_clusters);
 
-      pcl::console::print_info ("Found %d supervoxels\n", supervoxel_clusters.size ());
-      updateView (viewer, cloud, super);
+      // Interactive segmentation
+      std::vector <uint32_t> moving_parts = super.getMovingParts ();
+      pw_seg.update (moving_parts, frame_count);
+      PairwiseSegmentation::Segmentation curr_seg =
+          pw_seg.getCurrentSegmentation ();
+
+      std::cout << "------------CURRENT CLUSTERING------------\n";
+      for (const auto& pair: curr_seg)
+      {
+        std::cout << "[";
+        for (const uint32_t label: pair.second)
+        { std::cout << label << ", "; }
+        std::cout << "\b\b] ";
+      }
+      std::cout << "\n";
+
+      pcl::console::print_info ("Found %d supervoxels\n",
+                                supervoxel_clusters.size ());
+      updateView (viewer, cloud, super, supervoxel_clusters, pw_seg);
 
       viewer->spinOnce (time_pause_in_ms);
       while (manual_mode && !viewer->wasStopped ())
       {
         viewer->removeAllShapes ();
         viewer->removeAllPointClouds ();
-        updateView (viewer, cloud, super);
+        updateView (viewer, cloud, super, supervoxel_clusters, pw_seg);
         viewer->spinOnce (time_pause_in_ms);
       }
       viewer->removeAllShapes ();

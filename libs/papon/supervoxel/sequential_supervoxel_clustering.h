@@ -398,6 +398,22 @@ namespace pcl
       void
       getSupervoxelAdjacency (std::multimap<uint32_t, uint32_t> &label_adjacency) const;
 
+      /**
+       * @brief getMovingParts
+       * @return
+       */
+      std::vector<uint32_t>
+      getMovingParts ()
+      { return moving_parts_; }
+
+      /**
+       * @brief getMovingParts
+       * @param vec
+       */
+      void
+      getMovingParts (std::vector<uint32_t>& vec)
+      { vec = moving_parts_; }
+
     private:
       /** \brief This method initializes the label_colors_ vector (assigns random colors to labels)
        * \note Checks to see if it is already big enough - if so, does not reinitialize it
@@ -581,9 +597,21 @@ namespace pcl
       void
       computeVoxelData ();
 
+      /**
+       * @brief computeUnlabeledVoxelCentroidNormalCloud
+       */
+      void
+      computeUnlabeledVoxelCentroidNormalCloud ();
+
+
       /** \brief Compute the voxel data (index of each voxel in the octree and normal of each voxel) */
       void
       updatePrevClouds ();
+
+      /** \brief Update the unlabeled voxel and normal cloud by removing the indices given by indices
+        * and using pcl::StatisticalOutlierRemoval to remove noise from unlabeled voxel cloud */
+      void
+      updateUnlabeledCloud ();
 
       /** \brief Update the unlabeled normal cloud by removing the indices given by indices */
       void
@@ -685,8 +713,6 @@ namespace pcl
       /** \brief Whether to use default transform behavior or not */
       bool use_default_transform_behaviour_;
 
-
-
       bool prune_close_seeds_;
 
       pcl::StopWatch timer_;
@@ -694,6 +720,7 @@ namespace pcl
 
       int nb_of_unlabeled_voxels_;
 
+      std::vector<uint32_t> moving_parts_;
       /** \brief Internal storage class for supervoxels
        * \note Stores pointers to leaves of clustering internal octree,
        * \note so should not be used outside of clustering class

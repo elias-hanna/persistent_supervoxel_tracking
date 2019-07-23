@@ -51,6 +51,8 @@ pcl::SequentialSVClustering<PointT>::SequentialSVClustering (float voxel_resolut
   resolution_ (voxel_resolution),
   seed_resolution_ (seed_resolution),
   voxel_centroid_cloud_ (),
+  unlabeled_voxel_centroid_cloud_ (),
+  unlabeled_voxel_centroid_normal_cloud_ (),
   color_importance_ (0.1f),
   spatial_importance_ (0.4f),
   normal_importance_ (1.0f),
@@ -265,8 +267,51 @@ pcl::SequentialSVClustering<PointT>::updatePrevClouds ()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
+pcl::SequentialSVClustering<PointT>::computeUnlabeledVoxelCentroidNormalCloud ()
+{
+  unlabeled_voxel_centroid_normal_cloud_.reset (new NormalCloud);
+  unlabeled_voxel_centroid_normal_cloud_->resize(unlabeled_voxel_centroid_cloud_->size ());
+  NormalCloud::iterator normal_cloud_itr = unlabeled_voxel_centroid_normal_cloud_->begin();
+  typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
+  for (; leaf_itr != sequential_octree_->end (); ++leaf_itr)
+  {
+    SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
+    if(new_voxel_data.label_ == -1)
+    {
+      // Add the point to the normal cloud
+      new_voxel_data.getNormal (*normal_cloud_itr);
+      ++normal_cloud_itr;
+    }
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> void
+pcl::SequentialSVClustering<PointT>::updateUnlabeledCloud ()
+{
+  IndicesConstPtr filtered_indices (new std::vector<int>);
+  // Filter noise from unlabeled voxel centroid cloud
+  typename PointCloudT::Ptr tmp_cloud(new PointCloudT);
+  pcl::StatisticalOutlierRemoval<PointT> sor (true);
+  sor.setInputCloud (unlabeled_voxel_centroid_cloud_);
+  sor.setMeanK (50);
+  sor.setStddevMulThresh (0.001);
+//  sor.setNegative (true);
+  sor.filter (*unlabeled_voxel_centroid_cloud_);
+//  sor.filter (*tmp_cloud);
+//  unlabeled_voxel_centroid_cloud_.reset (new PointCloudT);
+//  unlabeled_voxel_centroid_cloud_->resize (tmp_cloud->size ());
+//  copyPointCloud(*tmp_cloud, *unlabeled_voxel_centroid_cloud_);
+  //  sor.getRemovedIndices (filtered_indices);
+  filtered_indices = sor.getRemovedIndices ();
+//  updateUnlabeledNormalCloud (filtered_indices);
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::updateUnlabeledNormalCloud (const IndicesConstPtr indices)
 {
+  computeUnlabeledVoxelCentroidNormalCloud ();
   if (indices->size () > 0)
   {
     pcl::PointIndices::Ptr point_indices(new pcl::PointIndices());
@@ -283,7 +328,6 @@ pcl::SequentialSVClustering<PointT>::updateUnlabeledNormalCloud (const IndicesCo
 template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::computeVoxelData ()
 {
-
   // Updating the unlabeled voxel centroid cloud (used for seeding)
   voxel_centroid_cloud_.reset (new PointCloudT);
   voxel_centroid_cloud_->resize (sequential_octree_->getLeafCount ());
@@ -344,20 +388,7 @@ pcl::SequentialSVClustering<PointT>::computeVoxelData ()
   {
     parallelComputeNormals ();
   }
-  IndicesConstPtr filtered_indices (new std::vector<int>);
-  // Filter noise from unlabeled voxel centroid cloud
-  typename PointCloudT::Ptr tmp_cloud(new PointCloudT);
-  pcl::StatisticalOutlierRemoval<PointT> sor (true);
-  sor.setInputCloud (unlabeled_voxel_centroid_cloud_);
-  sor.setMeanK (50);
-  sor.setStddevMulThresh (0.001);
-  sor.filter (*tmp_cloud);
-  unlabeled_voxel_centroid_cloud_.reset (new PointCloudT);
-  unlabeled_voxel_centroid_cloud_->resize (tmp_cloud->size ());
-  copyPointCloud(*tmp_cloud, *unlabeled_voxel_centroid_cloud_);
-  //  sor.getRemovedIndices (filtered_indices);
-  filtered_indices = sor.getRemovedIndices ();
-  updateUnlabeledNormalCloud (filtered_indices);
+  updateUnlabeledCloud ();
   //Update kdtree now that we have updated centroid cloud
   voxel_kdtree_.reset (new pcl::search::KdTree<PointT>);
   voxel_kdtree_->setInputCloud (voxel_centroid_cloud_);
@@ -1107,6 +1138,7 @@ pcl::SequentialSVClustering<PointT>::removeInliers (KeypointFeatureT& current_ke
 template <typename PointT> std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>
 pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters)
 {
+  moving_parts_.clear ();
   // This will store the transforms that are valid
   std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>> found_transforms;
   // previous_keypoints is a map where the key is the label of the concerned supervoxel, and the value is a pair
@@ -1180,6 +1212,7 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
           found_transforms.insert (std::pair<uint32_t, Eigen::Matrix<float, 4, 4>>
                                    (pair.first, result.best_fit_));
           labels.push_back(pair.first);
+          moving_parts_.push_back (pair.first);
           removeInliers (current_keypoints, result.best_inliers_set_);
         }
         else
@@ -1660,14 +1693,18 @@ pcl::SequentialSVClustering<PointT>::RANSACRegistration::operator() (const tbb::
       PointCloudFeatureT::Ptr inliers_feature_cloud (new PointCloudFeatureT);
       findInliers(pair_.second.second, k_indices, *current_keypoints_.first,
                   current_keypoints_.second, inliers, inliers_feature_cloud, threshold_, &err);
-      float coeff_in = 1.f; float coeff_err = 3.f;
-      float curr_score = coeff_in * inliers.size()/pair_.second.second->size () + ((coeff_err * (threshold_ - err) > 0)?coeff_err * (threshold_ - err)/threshold_:0);
-      if (curr_score > best_score_
-          && inliers.size () >= maybe_inliers.size ())
+      if (inliers.size () >= maybe_inliers.size ())
       {
-        best_fit_ = transformation_est;
-        best_score_ = curr_score;
-        best_inliers_set_ = inliers;
+        float coeff_in = 1.f; float coeff_err = 3.f;
+        float curr_score = coeff_in * inliers.size()/pair_.second.second->size ()
+            + ((coeff_err * (threshold_ - err) > 0)?coeff_err * (threshold_ - err)/threshold_:0);
+        if (curr_score > best_score_
+            && inliers.size () >= maybe_inliers.size ())
+        {
+          best_fit_ = transformation_est;
+          best_score_ = curr_score;
+          best_inliers_set_ = inliers;
+        }
       }
     }
   }

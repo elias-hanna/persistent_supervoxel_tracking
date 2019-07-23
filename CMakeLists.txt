@@ -21,8 +21,13 @@ set(SRCS
   # miscellaneous/persistent_world.cpp
   )
 
+set(HEADERS
+  libs/libfreenect2pclgrabber/include/k2g.h
+  libs/pairwise_segmentation/pairwise_segmentation.h
+  libs/pairwise_segmentation/pairwise_segmentation.hpp)
+
 # Notre exécutable
-add_executable(persistent_supervoxelization ${SRCS})
+add_executable(persistent_supervoxelization ${SRCS} ${HEADERS})
 
 # Link local libraries
 target_link_libraries(persistent_supervoxelization  #lib_tracker
