@@ -267,26 +267,6 @@ pcl::SequentialSVClustering<PointT>::updatePrevClouds ()
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> void
-pcl::SequentialSVClustering<PointT>::computeUnlabeledVoxelCentroidNormalCloud ()
-{
-  unlabeled_voxel_centroid_normal_cloud_.reset (new NormalCloud);
-  unlabeled_voxel_centroid_normal_cloud_->resize(unlabeled_voxel_centroid_cloud_->size ());
-  NormalCloud::iterator normal_cloud_itr = unlabeled_voxel_centroid_normal_cloud_->begin();
-  typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
-  for (; leaf_itr != sequential_octree_->end (); ++leaf_itr)
-  {
-    SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
-    if(new_voxel_data.label_ == -1)
-    {
-      // Add the point to the normal cloud
-      new_voxel_data.getNormal (*normal_cloud_itr);
-      ++normal_cloud_itr;
-    }
-  }
-}
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
 pcl::SequentialSVClustering<PointT>::updateUnlabeledCloud ()
 {
   IndicesConstPtr filtered_indices (new std::vector<int>);
@@ -304,7 +284,7 @@ pcl::SequentialSVClustering<PointT>::updateUnlabeledCloud ()
 //  copyPointCloud(*tmp_cloud, *unlabeled_voxel_centroid_cloud_);
   //  sor.getRemovedIndices (filtered_indices);
   filtered_indices = sor.getRemovedIndices ();
-//  updateUnlabeledNormalCloud (filtered_indices);
+  updateUnlabeledNormalCloud (filtered_indices);
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -321,6 +301,29 @@ pcl::SequentialSVClustering<PointT>::updateUnlabeledNormalCloud (const IndicesCo
     extract.setIndices(point_indices);
     extract.setNegative(true);
     extract.filter(*unlabeled_voxel_centroid_normal_cloud_);
+  }
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> void
+pcl::SequentialSVClustering<PointT>::computeUnlabeledVoxelCentroidNormalCloud ()
+{
+  unlabeled_voxel_centroid_normal_cloud_.reset (new NormalCloud);
+  unlabeled_voxel_centroid_normal_cloud_->resize(nb_of_unlabeled_voxels_);
+  NormalCloud::iterator normal_cloud_itr = unlabeled_voxel_centroid_normal_cloud_->begin();
+  typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
+  int idx = 0;
+  size_t size = unlabeled_voxel_centroid_cloud_->size ();
+  for (; leaf_itr != sequential_octree_->end (); ++leaf_itr)
+  {
+    SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
+    if(new_voxel_data.label_ == -1)
+    {
+      ++idx;
+      // Add the point to the normal cloud
+      new_voxel_data.getNormal (*normal_cloud_itr);
+      ++normal_cloud_itr;
+    }
   }
 }
 
