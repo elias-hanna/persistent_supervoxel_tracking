@@ -117,6 +117,7 @@ namespace pcl
       friend class SequentialSupervoxelHelper;
       friend class RansacSupervoxelTracker;
     public:
+      // Attributes used for visualization
       std::unordered_map<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>> lines_;
       std::vector<int> previous_keypoints_indices_;
       std::vector<int> current_keypoints_indices_;
@@ -244,13 +245,6 @@ namespace pcl
       typedef pcl::PointCloud<pcl::PointXYZI> PointCloudI;
 
       // Feature space search types
-      //      typedef union FeatureT_
-      //      {
-      //          pcl::Histogram<32> rift32_descriptor;
-      //          pcl::FPFHSignature33 fpfh33_descriptor;
-      //      } FeatureT;
-
-      //      typedef pcl::Histogram<32> FeatureT;
       typedef pcl::FPFHSignature33 FeatureT;
       typedef flann::L1<float> DistanceT; // Manhattan distance
       //      typedef flann::L2<float> DistanceT;
@@ -410,6 +404,14 @@ namespace pcl
       { return moving_parts_; }
 
       /**
+       * @brief getToResetParts
+       * @return
+       */
+      std::vector<uint32_t>
+      getToResetParts ()
+      { return to_reset_parts_; }
+
+      /**
        * @brief getMovingParts
        * @param vec
        */
@@ -417,19 +419,20 @@ namespace pcl
       getMovingParts (std::vector<uint32_t>& vec)
       { vec = moving_parts_; }
 
+      /**
+       * @brief getToResetParts
+       * @param vec
+       */
+      void
+      getToResetParts (std::vector<uint32_t>& vec)
+      { vec = to_reset_parts_; }
+
     private:
       /** \brief This method initializes the label_colors_ vector (assigns random colors to labels)
        * \note Checks to see if it is already big enough - if so, does not reinitialize it
        */
       void
       initializeLabelColors ();
-
-      /** \brief This method computes the RIFT descriptors of the given keypoints
-       * \param[out] A pair containing the indices of the points in the given cloud and their descriptors
-       */
-      std::pair< pcl::IndicesPtr, pcl::PointCloud< pcl::Histogram<32> >::Ptr >
-      computeRIFTDescriptors (const PointCloudScale sift_result, const PointCloudIG::Ptr cloud_ig,
-                              const PointCloudI::Ptr xyzi_total_cloud) const;
 
       /** \brief This method computes the FPFH descriptors of the given keypoints
        * \param[out] A pointcloud of the descriptors
@@ -453,19 +456,6 @@ namespace pcl
       std::vector<int>
       computeKeypointsMatches(const std::vector<int> to_match_indices, const PointCloudFeatureT to_match_feature_cloud,
                               const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > indices_point_pair);
-
-      /** \brief This method computes the intensity gradient of the given input cloud
-       * \param[out] The Intensity Gradient PointCloud
-       */
-      void
-      computeIntensityGradientCloud (PointCloudIG::Ptr cloud_ig, const PointCloudI::Ptr xyzi_total_cloud,
-                                     const NormalCloud::Ptr total_normal_cloud) const;
-      /** \brief This method computes the intensity gradient cloud and the intensity cloud
-       * that are required by the SIFT algorithm to compute keypoints
-       */
-      void
-      computeRIFTRequiredClouds (PointCloudIG::Ptr cloud_ig, PointCloudI::Ptr xyzi_total_cloud,
-                                 typename PointCloudT::Ptr cloud, NormalCloud::Ptr normal_cloud);
 
       /** \brief Init the computation, update the sequential octree, perform global check to see wether supervoxel have changed
        * more than their half and finally compute the voxel data to be used to determine the supervoxel seeds
@@ -491,19 +481,6 @@ namespace pcl
       std::vector<uint32_t>
       getLabelsOfDynamicSV (SequentialSVMapT &supervoxel_clusters);
 
-      /** \brief This method initializes a SIFTKeypoints object with the inputed
-       * parameters and a KdTree search method */
-      void
-      initializeSIFT (pcl::SIFTKeypoint<PointT, pcl::PointWithScale> &sift,
-                      float min_scale, float min_contrast, int n_octaves = 4, int n_scales_per_octave = 8);
-
-      /** \brief This method uses a RANSAC based algorithm to find matches to disappeared/occluded supervoxels from previous
-       * frame that woud appear in the current frame
-       * \param[out] matches found in the form of an STL unordered map with label as key and pcl::recognition::ObjRecRANSAC::Output as value
-       */
-      std::unordered_map <uint32_t, pcl::recognition::ObjRecRANSAC::Output>
-      getMatches (SequentialSVMapT supervoxel_clusters);
-
       /** \brief This methode removes the keypoints from current_keypoints given by the indices
        * in to remove_indices */
       void
@@ -524,46 +501,8 @@ namespace pcl
        * \param[out] matches found in the form of an STL unordered map with label as key and pcl::recognition::ObjRecRANSAC::Output as value
        */
       std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>
-                                                               getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters);
+      getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters);
 
-      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
-       * \note This overload compute keypoints and descriptors from the previous supervoxel clusters
-       * and stores it as a map linking the supervoxel label to a pair of indices (the keypoints in previous voxel cloud)
-       * and the corresponding descriptor cloud (FeatureT points) */
-      void
-      computeSIFTKeypointsAndRIFTDescriptors(SequentialSVMapT &supervoxel_clusters,
-                                             KeypointMapFeatureT &previous_keypoints,
-                                             int min_nb_of_keypoints,
-                                             float min_scale, float min_contrast,
-                                             int n_octaves = 4, int n_scales_per_octave = 8);
-      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
-       * \note This overload compute keypoints and descriptors from the current unlabeled voxel cloud
-       * and stores it as a pair of indices (the keypoints in previous voxel cloud)
-       * and the corresponding descriptor cloud (FeatureT points) */
-      void
-      computeSIFTKeypointsAndRIFTDescriptors(KeypointFeatureT &current_keypoints,
-                                             int min_nb_of_keypoints,
-                                             float min_scale, float min_contrast,
-                                             int n_octaves = 4, int n_scales_per_octave = 8);
-      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
-       * \note This overload compute keypoints and descriptors from the previous supervoxel clusters
-       * and stores it as a map linking the supervoxel label to a pair of indices (the keypoints in previous voxel cloud)
-       * and the corresponding descriptor cloud (FeatureT points) */
-      void
-      computeSIFTKeypointsAndFPFHDescriptors( SequentialSVMapT &supervoxel_clusters,
-                                              KeypointMapFeatureT &previous_keypoints,
-                                              int min_nb_of_keypoints,
-                                              float min_scale, float min_contrast,
-                                              int n_octaves = 4, int n_scales_per_octave = 8);
-      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
-       * \note This overload compute keypoints and descriptors from the current unlabeled voxel cloud
-       * and stores it as a pair of indices (the keypoints in previous voxel cloud)
-       * and the corresponding descriptor cloud (FeatureT points) */
-      void
-      computeSIFTKeypointsAndFPFHDescriptors( KeypointFeatureT &current_keypoints,
-                                              int min_nb_of_keypoints,
-                                              float min_scale, float min_contrast,
-                                              int n_octaves = 4, int n_scales_per_octave = 8);
       /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
        * \note This overload compute keypoints and descriptors from the previous supervoxel clusters
        * and stores it as a map linking the supervoxel label to a pair of indices (the keypoints in previous voxel cloud)
@@ -572,6 +511,7 @@ namespace pcl
       computeUniformKeypointsAndFPFHDescriptors(SequentialSVMapT &supervoxel_clusters,
                                                 KeypointMapFeatureT &previous_keypoints,
                                                 int min_nb_of_keypoints);
+
       /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
        * \note This overload compute keypoints and descriptors from the current unlabeled voxel cloud
        * and stores it as a pair of indices (the keypoints in previous voxel cloud)
@@ -579,6 +519,7 @@ namespace pcl
       void
       computeUniformKeypointsAndFPFHDescriptors(KeypointFeatureT &current_keypoints,
                                                 int min_nb_of_keypoints);
+
       /** \brief This method randomly draws nb_to_sample points from indices (and removes them
        * from indices and cloud) and stores them accordingly in potential_inliers and
        * potential_inliers_feature_cloud. */
@@ -634,6 +575,12 @@ namespace pcl
        */
       void
       parallelComputeNormals ();
+
+      /**
+       * @brief computeUnlabeledVoxelCentroidCloud
+       */
+      void
+      computeUnlabeledVoxelCentroidCloud ();
 
       /** \brief Distance function used for comparing voxelDatas */
       float
@@ -713,12 +660,6 @@ namespace pcl
       pcl::PointCloud<pcl::PointXYZ>::Ptr
       curr_keypoints_location_;
 
-      /**
-       * @brief prev_occluded_voxels
-       */
-      std::vector<bool>
-      prev_occluded_voxels;
-
       /** \brief Contains the Normals of the input Cloud */
       typename NormalCloud::ConstPtr input_normals_;
 
@@ -751,6 +692,8 @@ namespace pcl
       int nb_of_unlabeled_voxels_;
 
       std::vector<uint32_t> moving_parts_;
+
+      std::vector<uint32_t> to_reset_parts_;
       /** \brief Internal storage class for supervoxels
        * \note Stores pointers to leaves of clustering internal octree,
        * \note so should not be used outside of clustering class

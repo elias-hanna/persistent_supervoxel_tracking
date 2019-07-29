@@ -43,8 +43,6 @@
 //#include "octree_pointcloud_adjacency.h"
 #include <pcl/octree/octree_pointcloud.h>
 #include "octree_pointcloud_sequential_container.h"
-// Parallelizer includes
-//#include <tbb/tbb.h>
 // Boost includes
 #include <boost/function.hpp>
 
@@ -71,8 +69,6 @@ namespace pcl
 
         typedef OctreeBase<LeafContainerT, BranchContainerT> OctreeBaseT;
         typedef OctreePointCloud<PointT, LeafContainerT, BranchContainerT,OctreeBaseT > OctreePointCloudT;
-        /* REMOVED BECAUSE WE INHERIT FROM OCTREEPOINTCLOUD NOT ADJACENCY */
-        //                typedef OctreePointCloudAdjacency<PointT, LeafContainerT, BranchContainerT > OctreeAdjacencyT;
 
         typedef typename OctreePointCloudT::LeafNode LeafNode;
         typedef typename OctreePointCloudT::BranchNode BranchNode;
@@ -92,10 +88,6 @@ namespace pcl
         typedef typename LeafVectorT::iterator iterator;
         typedef typename LeafVectorT::const_iterator const_iterator;
 
-        /* REMOVED BECAUSE WE INHERIT FROM OCTREEPOINTCLOUD NOT ADJACENCY */
-        //        using OctreeAdjacencyT::begin;
-        //        using OctreeAdjacencyT::end;
-        //        using OctreeAdjacencyT::at;
         inline iterator begin () { return (leaf_vector_.begin ()); }
         inline iterator end ()   { return (leaf_vector_.end ()); }
         inline LeafContainerT* at (size_t idx)   { return leaf_vector_.at (idx); }
@@ -285,11 +277,6 @@ namespace pcl
         //Stores a pointer to a difference function
         boost::function<float (const LeafContainerT* leaf)> diff_func_;
 
-        /* REMOVED BECAUSE WE INHERIT FROM OCTREEPOINTCLOUD NOT ADJACENCY */
-        //Stores pairs of leaf pointers & octree key ptrs to leaves
-        //                using OctreeAdjacencyT::leaf_vector_;
-        //                using OctreeAdjacencyT::key_vector_;
-        //                using OctreeAdjacencyT::transform_func_;
         /// Local leaf and key pointer vector used to make iterating through leaves fast.
         LeafVectorT leaf_vector_;
         KeyVectorT key_vector_;

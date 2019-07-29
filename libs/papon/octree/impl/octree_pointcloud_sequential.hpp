@@ -44,14 +44,14 @@
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> 
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::OctreePointCloudSequential (const double resolution_arg)
-: OctreePointCloud<PointT, LeafContainerT, BranchContainerT
-  , OctreeBase<LeafContainerT, BranchContainerT> > (resolution_arg),
-  diff_func_ (0),
-  difference_threshold_ (0.1f),
-  occlusion_test_interval_ (0.5f),
-  threads_ (1),
-  stored_keys_valid_ (false),
-  frame_counter_ (0)
+  : OctreePointCloud<PointT, LeafContainerT, BranchContainerT
+    , OctreeBase<LeafContainerT, BranchContainerT> > (resolution_arg),
+    diff_func_ (0),
+    difference_threshold_ (0.1f),
+    occlusion_test_interval_ (0.5f),
+    threads_ (1),
+    stored_keys_valid_ (false),
+    frame_counter_ (0)
 {
 
 }
@@ -142,9 +142,9 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
     //If no neighbors probably noise - delete
     if (leaf_container->getNumNeighbors () <= 1)
     {
-//      #ifdef _OPENMP
-//      #pragma omp critical (delete_leaves)
-//      #endif
+      //      #ifdef _OPENMP
+      //      #pragma omp critical (delete_leaves)
+      //      #endif
       {
         delete_leaves.push_back (leaf_container);
         delete_keys.push_back (*key);
@@ -160,7 +160,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
         
         //This is basically a test to remove extra voxels caused by objects moving towards the camera
         if (occluder_pair.first <= 4.0f || (testForNewNeighbors(leaf_container)
-                                              && leaf_container->getData().frame_occluded_ != occluder_pair.second->getData().frame_occluded_))
+                                            && leaf_container->getData().frame_occluded_ != occluder_pair.second->getData().frame_occluded_))
         {
           // #ifdef _OPENMP
           // #pragma omp critical (delete_leaves)
@@ -228,7 +228,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
 
   //All keys which were stored in new_frame_pairs_ are valid, so this is now true for leaf_key_vec_
   stored_keys_valid_ = true;
- //Go through and delete voxels scheduled
+  //Go through and delete voxels scheduled
   for (typename LeafVectorT::iterator delete_itr = delete_leaves.begin (); delete_itr != delete_leaves.end (); ++delete_itr)
   {
     LeafContainerT *leaf_container = *delete_itr;
@@ -262,7 +262,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
     boost::shared_ptr<OctreeKey> key = key_vector_[i];
     if (leaf_container->getPointCounter () != 0) //Existed in previous frame and observed so just update data
     {
-      if ( diff_func_ && diff_func_ (leaf_container) > difference_threshold_)
+      if (diff_func_ && diff_func_ (leaf_container) >= difference_threshold_)
       {
         leaf_container->getData ().setChanged (true);
       }
@@ -338,7 +338,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
 
   //All keys which were stored in new_frame_pairs_ are valid, so this is now true for leaf_key_vec_
   stored_keys_valid_ = true;
- //Go through and delete voxels scheduled
+  //Go through and delete voxels scheduled
   for (typename LeafVectorT::iterator delete_itr = delete_leaves.begin (); delete_itr != delete_leaves.end (); ++delete_itr)
   {
     LeafContainerT *leaf_container = *delete_itr;
@@ -421,7 +421,6 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   {
     return;
   }
-  std::cout << "Nb: " << nb_deleted_ << "\n";
   // Delete the leaf from its neighbours
   LeafContainerT *leaf_container = getLeafContainerAtPoint(point_arg);
   //Remove pointer to it from all neighbors
@@ -456,7 +455,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
     PointT temp (point_arg);
     transform_func_ (temp);
 
-   // calculate integer key for transformed point coordinates
+    // calculate integer key for transformed point coordinates
     if (pcl::isFinite (temp)) //Make sure transformed point is finite - if it is not, it gets default key
     {
       key_arg.x = static_cast<unsigned int> ((temp.x - this->min_x_) / this->resolution_);

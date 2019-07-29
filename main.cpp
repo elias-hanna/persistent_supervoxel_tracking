@@ -76,6 +76,8 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer,
 {
   // Get the voxel centroid cloud
   PointCloudT::Ptr voxel_centroid_cloud = super.getVoxelCentroidCloud ();
+  // Get the colored voxel centroid cloud
+  PointCloudT::Ptr colored_voxel_centroid_cloud = super.getColoredVoxelCloud ();
   // Get the labeled voxel cloud
   PointLCloudT::Ptr labeled_voxel_cloud = super.getLabeledVoxelCloud ();
   // Get the labeled voxel cloud
@@ -92,6 +94,9 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer,
   {
     if (!viewer->updatePointCloud (labeled_voxel_cloud, "displayed cloud"))
     { viewer->addPointCloud (labeled_voxel_cloud, "displayed cloud"); }
+//    pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgba(colored_voxel_centroid_cloud);
+//    if (!viewer->updatePointCloud (colored_voxel_centroid_cloud, rgba, "displayed cloud"))
+//    { viewer->addPointCloud (colored_voxel_centroid_cloud, rgba, "displayed cloud"); }
   }
   // Show the observed pointcloud
   else if (!show_segmentation)
@@ -153,7 +158,7 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer,
     // Show current keypoint cloud
     if (show_curr)
     {
-      for (const auto& idx: super.current_keypoints_indices_)
+      for (const size_t& idx: super.current_keypoints_indices_)
       {
         if (!viewer->updateSphere((*voxel_centroid_cloud)[idx],
                                   0.002, 125, 125, 0,
@@ -169,7 +174,7 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer,
     {
       // Get the previous voxel centroid cloud
       PointCloudT::Ptr prev_voxel_centroid_cloud = super.getPrevVoxelCentroidCloud ();
-      for (const auto& idx: super.previous_keypoints_indices_)
+      for (const size_t& idx: super.previous_keypoints_indices_)
       {
         if (!viewer->updateSphere((*prev_voxel_centroid_cloud)[idx],
                                   0.002, 0, 0, 255,
@@ -369,14 +374,13 @@ main( int argc, char** argv )
     //    viewer->addLine (pt1, pt2, "test_line");
     //    viewer->addSphere(pt1, 0.005, 0, 255, 0, "start_test ");
     //    viewer->addSphere(pt2, 0.005, 255, 0, 0, "end_test ");
-    float minX = -0.4; float minY = -0.25; float minZ = 0.9;
-    float maxX = 0.5; float maxY = 0.5; float maxZ = 1.55;
+    float minX = -0.35; float minY = -0.25; float minZ = 0.8;
+    float maxX = 0.35; float maxY = 0.5; float maxZ = 1.4;
     pcl::CropBox<PointT> boxFilter;
     boxFilter.setMin(Eigen::Vector4f(minX, minY, minZ, 1.0));
     boxFilter.setMax(Eigen::Vector4f(maxX, maxY, maxZ, 1.0));
     boxFilter.setInputCloud(tmp_cloud);
     boxFilter.filter(*cloud);
-    //    copyPointCloud(*tmp_cloud, *cloud);//cloud = clouds[i%N_DATA];
 
     // If a cloud got captured from the device
     if(!cloud->empty())
@@ -389,6 +393,8 @@ main( int argc, char** argv )
       super.extract (supervoxel_clusters);
 
       // Interactive segmentation
+      std::vector <uint32_t> to_reset_parts = super.getToResetParts ();
+      pw_seg.resetParts (to_reset_parts);
       std::vector <uint32_t> moving_parts = super.getMovingParts ();
       pw_seg.update (moving_parts, frame_count);
       PairwiseSegmentation::Segmentation curr_seg =
