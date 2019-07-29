@@ -53,6 +53,8 @@ pcl::SequentialSVClustering<PointT>::SequentialSVClustering (float voxel_resolut
   voxel_centroid_cloud_ (),
   unlabeled_voxel_centroid_cloud_ (),
   unlabeled_voxel_centroid_normal_cloud_ (),
+  prev_keypoints_location_ (),
+  curr_keypoints_location_ (),
   color_importance_ (0.1f),
   spatial_importance_ (0.4f),
   normal_importance_ (1.0f),
@@ -115,7 +117,7 @@ pcl::SequentialSVClustering<PointT>::setInputCloud (const typename pcl::PointClo
   }
   else
   {
-    prev_sequential_octree_ = sequential_octree_;
+    *prev_sequential_octree_ = *sequential_octree_;
     sequential_octree_->setInputCloud (cloud);
   }
 }
@@ -261,6 +263,10 @@ pcl::SequentialSVClustering<PointT>::updatePrevClouds ()
       SequentialVoxelData& prev_voxel_data = (*leaf_itr)->getData ();
       prev_voxel_data.getPoint (*prev_cent_cloud_itr);
       prev_voxel_data.getNormal (*prev_cent_norm_cloud_itr);
+      //      if (prev_voxel_data.frame_occluded_ != 0)
+      //      { prev_occluded_voxels.push_back (true); }
+      //      else
+      //      { prev_occluded_voxels.push_back (false); }
     }
   }
 }
@@ -276,12 +282,12 @@ pcl::SequentialSVClustering<PointT>::updateUnlabeledCloud ()
   sor.setInputCloud (unlabeled_voxel_centroid_cloud_);
   sor.setMeanK (50);
   sor.setStddevMulThresh (0.001);
-//  sor.setNegative (true);
+  //  sor.setNegative (true);
   sor.filter (*unlabeled_voxel_centroid_cloud_);
-//  sor.filter (*tmp_cloud);
-//  unlabeled_voxel_centroid_cloud_.reset (new PointCloudT);
-//  unlabeled_voxel_centroid_cloud_->resize (tmp_cloud->size ());
-//  copyPointCloud(*tmp_cloud, *unlabeled_voxel_centroid_cloud_);
+  //  sor.filter (*tmp_cloud);
+  //  unlabeled_voxel_centroid_cloud_.reset (new PointCloudT);
+  //  unlabeled_voxel_centroid_cloud_->resize (tmp_cloud->size ());
+  //  copyPointCloud(*tmp_cloud, *unlabeled_voxel_centroid_cloud_);
   //  sor.getRemovedIndices (filtered_indices);
   filtered_indices = sor.getRemovedIndices ();
   updateUnlabeledNormalCloud (filtered_indices);
@@ -779,9 +785,10 @@ pcl::SequentialSVClustering<PointT>::computeFPFHDescriptors (const PointCloudSca
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
+template <typename PointT> pcl::PointIndicesPtr
 pcl::SequentialSVClustering<PointT>::filterKeypoints(const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > to_filter_keypoints, std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr >& filtered_keypoints) const
 {
+  pcl::PointIndicesPtr filtered_point_indices (new pcl::PointIndices ());
   for (size_t idx = 0; idx < to_filter_keypoints.second->size (); ++idx)
   {
     bool to_remove = false;
@@ -803,7 +810,10 @@ pcl::SequentialSVClustering<PointT>::filterKeypoints(const std::pair <pcl::Indic
       filtered_keypoints.first->push_back((*to_filter_keypoints.first)[idx]);
       filtered_keypoints.second->push_back(descriptor);
     }
+    else
+    { filtered_point_indices->indices.push_back (idx); }
   }
+  return filtered_point_indices;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -868,6 +878,7 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors(S
                                                                                KeypointMapFeatureT &previous_keypoints,
                                                                                int min_nb_of_keypoints)
 {
+  prev_keypoints_location_.clear ();
   // Get the labels that need to be tracked
   std::vector<uint32_t> labels_to_track = getLabelsOfDynamicSV (supervoxel_clusters);
   for (const auto& label: labels_to_track)
@@ -886,21 +897,31 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors(S
     typename PointCloudT::Ptr tmp (new PointCloudT);
     for (const auto& point: voxel_centers)
     { tmp->push_back (point); }
+
     copyPointCloud (*tmp, *keypoints);
-    //    copyPointCloud (*supervoxel_clusters[label]->voxels_, *keypoints);
+    //    pcl::PointCloud<pcl::PointXYZ>::Ptr prev_keypoints_pc (new pcl::PointCloud<pcl::PointXYZ>);
+    //    copyPointCloud (*tmp, *prev_keypoints_pc);
     if(keypoints->size () > min_nb_of_keypoints)
     {
       // Compute the RIFT descriptors
       KeypointFeatureT fpfh_output = computeFPFHDescriptors (*keypoints, prev_voxel_centroid_cloud_, prev_voxel_centroid_normal_cloud_);
       KeypointFeatureT filtered_fpfh_output
           (boost::make_shared<std::vector<int>> (), boost::make_shared<PointCloudFeatureT> ());
-      filterKeypoints(fpfh_output, filtered_fpfh_output);
+      pcl::PointIndicesPtr filtered_point_indices = filterKeypoints(fpfh_output, filtered_fpfh_output);
       if(filtered_fpfh_output.second->size () > min_nb_of_keypoints)// Min number of keypoints in order to track the supervoxel
       {
         previous_keypoints.insert (std::pair<uint32_t, KeypointFeatureT> (label, filtered_fpfh_output));
+        //        if (filtered_point_indices->indices.size () > 0)
+        //        {
+        //          pcl::ExtractIndices<pcl::PointXYZ> extract;
+        //          extract.setInputCloud(prev_keypoints_pc);
+        //          extract.setIndices(filtered_point_indices);
+        //          extract.setNegative(true);
+        //          extract.filter(*prev_keypoints_pc);
+        //        }
+        //        prev_keypoints_location_.insert ({label, prev_keypoints_pc});
       }
     }
-
   }
 }
 
@@ -922,7 +943,6 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors(K
   for (const auto& point: voxel_centers)
   { tmp->push_back (point); }
   copyPointCloud (*tmp, *keypoints);
-
   //  copyPointCloud (*unlabeled_voxel_centroid_cloud_, *keypoints);
   if(keypoints->size () > min_nb_of_keypoints)
   {
@@ -930,10 +950,19 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors(K
     KeypointFeatureT fpfh_output = computeFPFHDescriptors (*keypoints, voxel_centroid_cloud_, getVoxelNormalCloud ());
     KeypointFeatureT filtered_fpfh_output
         (boost::make_shared<std::vector<int>> (), boost::make_shared<PointCloudFeatureT> ());
-    filterKeypoints(fpfh_output, filtered_fpfh_output);
+    pcl::PointIndicesPtr filtered_point_indices = filterKeypoints(fpfh_output, filtered_fpfh_output);
     if(filtered_fpfh_output.second->size () > min_nb_of_keypoints)// Min number of keypoints in order to track the supervoxel
     {
       current_keypoints = filtered_fpfh_output;
+      //      copyPointCloud (*tmp, *curr_keypoints_location_);
+      //      if (filtered_point_indices->indices.size () > 0)
+      //      {
+      //        pcl::ExtractIndices<pcl::PointXYZ> extract;
+      //        extract.setInputCloud(curr_keypoints_location_);
+      //        extract.setIndices(filtered_point_indices);
+      //        extract.setNegative(true);
+      //        extract.filter(*curr_keypoints_location_);
+      //      }
     }
   }
 }
@@ -1101,7 +1130,7 @@ bool : Represents if element is present in vector or not.
 int : Represents the index of element in vector if its found else -1
 
 */
-template < typename T> std::pair<bool, int>
+template <typename T> std::pair<bool, int>
 findInVector(const std::vector<T>& vecOfElements, const T& element)
 {
   std::pair<bool, int > result;
@@ -1137,6 +1166,122 @@ pcl::SequentialSVClustering<PointT>::removeInliers (KeypointFeatureT& current_ke
   }
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template <typename PointT> bool
+pcl::SequentialSVClustering<PointT>::testForOcclusionCriterium
+(const std::vector<int>& to_match_indices,
+ const std::vector<int>& matches_indices) const
+{
+  // Test
+  uint64_t prev_counter = 0;
+  uint64_t curr_counter = 0;
+  double thresh = 0.7;
+  pcl::VoxelGridOcclusionEstimation<PointT>
+      prevVoxelFilter, currVoxelFilter;
+  prevVoxelFilter.setInputCloud (voxel_centroid_cloud_);
+  prevVoxelFilter.setLeafSize (resolution_, resolution_, resolution_);
+  prevVoxelFilter.initializeVoxelGrid();
+  // Go through the previous points
+  for (const auto& prev_indice: to_match_indices)
+  {
+    PointT pt = prev_voxel_centroid_cloud_->at (prev_indice);
+    Eigen::Vector3i grid_cordinates =
+        prevVoxelFilter.getGridCoordinates (pt.x, pt.y, pt.z);
+    int grid_state;
+    prevVoxelFilter.occlusionEstimation(grid_state, grid_cordinates);
+    if (grid_state == 1)
+    { ++prev_counter; }
+  }
+  currVoxelFilter.setInputCloud (prev_voxel_centroid_cloud_);
+  currVoxelFilter.setLeafSize (resolution_, resolution_, resolution_);
+  currVoxelFilter.initializeVoxelGrid();
+  // Go through the previous points
+  for (const auto& curr_indice: matches_indices)
+  {
+    PointT pt = voxel_centroid_cloud_->at (curr_indice);
+    Eigen::Vector3i grid_cordinates =
+        currVoxelFilter.getGridCoordinates (pt.x, pt.y, pt.z);
+    int grid_state;
+    currVoxelFilter.occlusionEstimation(grid_state, grid_cordinates);
+    if (grid_state == 1)
+    { ++curr_counter; }
+  }
+  std::cout << "ratio prev: " << static_cast<double> (prev_counter)/to_match_indices.size ()
+            << "ratio curr: " << static_cast<double> (curr_counter)/matches_indices.size () << "\n";
+  return
+      (static_cast<double> (prev_counter)/to_match_indices.size () <= thresh
+       || static_cast<double> (curr_counter)/matches_indices.size () <= thresh);
+
+  //  // Test
+  //  uint64_t prev_counter = 0;
+  //  uint64_t curr_counter = 0;
+  //  double thresh = 0.5;
+
+  //  // Go through the previous points
+  //  for (const auto& prev_indice: to_match_indices)
+  //  {
+  //    PointT pt = prev_voxel_centroid_cloud_->at (prev_indice);
+  //    if (prev_sequential_octree_->isVoxelOccupiedAtPoint (pt))
+  //    {
+  //      LeafContainerT* prev_leaf = prev_sequential_octree_->findLeafAtPoint (pt);
+  //      SequentialVoxelData& prev_data = prev_leaf->getData ();
+  //      if (prev_data.frame_occluded_ != 0)
+  //      { ++prev_counter; }
+  //    }
+  //  }
+  //  // Go through the previous points
+  //  for (const auto& curr_indice: matches_indices)
+  //  {
+  //    PointT pt = voxel_centroid_cloud_->at (curr_indice);
+  //    if (sequential_octree_->isVoxelOccupiedAtPoint (pt))
+  //    {
+  //      LeafContainerT* curr_leaf = sequential_octree_->findLeafAtPoint (pt);
+  //      SequentialVoxelData& curr_data = curr_leaf->getData ();
+  //      if (curr_data.frame_occluded_ != 0)
+  //      { ++curr_counter; }
+  //    }
+  //  }
+  //  std::cout << "ratio prev: "
+  //            << static_cast<double> (prev_counter)/to_match_indices.size ()
+  //            << " ratio curr: "
+  //            << static_cast<double> (curr_counter)/matches_indices.size ()
+  //            << "\n";
+  //  return
+  //      (static_cast<double> (prev_counter)/to_match_indices.size () <= thresh
+  //       && static_cast<double> (curr_counter)/matches_indices.size () <= thresh);
+
+  //  // Test
+  //  uint64_t prev_counter = 0;
+  //  uint64_t curr_counter = 0;
+  //  double thresh = 0.5;
+
+  //  // Go through the previous points
+  //  for (const auto& prev_indice: to_match_indices)
+  //  {
+  //    PointT pt = prev_voxel_centroid_cloud_->at (prev_indice);
+  //    boost::shared_ptr<pcl::octree::OctreeKey> key (new pcl::octree::OctreeKey (pt.x, pt.y, pt.z));
+  //    std::pair<float, LeafContainerT*> occluder_pair = sequential_octree_->testForOcclusion (key);
+  //    if (occluder_pair.first != 0.0f)
+  //    { ++prev_counter; }
+  //  }
+  //  // Go through the previous points
+  //  for (const auto& curr_indice: matches_indices)
+  //  {
+  //    PointT pt = voxel_centroid_cloud_->at (curr_indice);
+  //    boost::shared_ptr<pcl::octree::OctreeKey> key (new pcl::octree::OctreeKey (pt.x, pt.y, pt.z));
+  //    std::pair<float, LeafContainerT*> occluder_pair = prev_sequential_octree_->testForOcclusion (key);
+  //    if (occluder_pair.first != 0.0f)
+  //    { ++curr_counter; }
+  //  }
+  //  std::cout << "ratio prev: "
+  //            << static_cast<double> (prev_counter)/to_match_indices.size ()
+  //            << " ratio curr: "
+  //            << static_cast<double> (curr_counter)/matches_indices.size ()
+  //            << "\n";
+  //  return
+  //      (static_cast<double> (prev_counter)/to_match_indices.size () <= thresh
+  //       && static_cast<double> (curr_counter)/matches_indices.size () <= thresh);
+}
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template <typename PointT> std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>
 pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters)
@@ -1206,17 +1351,28 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC (SequentialSVMapT &supervo
                                    threshold,
                                    seed_resolution_);
         parallel_reduce(tbb::blocked_range<size_t>(0,num_max_iter), result );
-        if(result.best_score_>0)
+        if(result.best_score_ > 0)
         {
-          std::cout << "SV w/ label " << pair.first
-                    << " was matched and the found transform has a score of "
-                    << result.best_score_ << " and "
-                    << result.best_inliers_set_.size () << " inliers.\n";
-          found_transforms.insert (std::pair<uint32_t, Eigen::Matrix<float, 4, 4>>
-                                   (pair.first, result.best_fit_));
-          labels.push_back(pair.first);
-          moving_parts_.push_back (pair.first);
-          removeInliers (current_keypoints, result.best_inliers_set_);
+          if (testForOcclusionCriterium (*(pair.second.first),
+                                         result.best_inliers_set_))
+          {
+            std::cout << "SV w/ label " << pair.first
+                      << " was matched and the found transform has a score of "
+                      << result.best_score_ << " and "
+                      << result.best_inliers_set_.size () << " inliers.\n";
+            found_transforms.insert (std::pair<uint32_t, Eigen::Matrix<float, 4, 4>>
+                                     (pair.first, result.best_fit_));
+            labels.push_back(pair.first);
+            moving_parts_.push_back (pair.first);
+            removeInliers (current_keypoints, result.best_inliers_set_);
+          }
+          else
+          {
+            std::cout << "SV w/ label " << pair.first
+                      << " wasn't matched because it didn't "
+                         "meet the occlusion criterium\n";
+            removeInliers (current_keypoints, result.best_inliers_set_);
+          }
         }
         else
         { std::cout << "SV w/ label " << pair.first << " wasn't matched !\n"; }

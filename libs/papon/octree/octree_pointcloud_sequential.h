@@ -47,7 +47,6 @@
 //#include <tbb/tbb.h>
 // Boost includes
 #include <boost/function.hpp>
-#include <boost/thread/mutex.hpp>
 
 namespace pcl
 { 
@@ -63,6 +62,8 @@ namespace pcl
               typename BranchContainerT = OctreeContainerEmpty >
     class OctreePointCloudSequential : public OctreePointCloud< PointT, LeafContainerT, BranchContainerT>
     {
+        template <typename PointTT>
+        friend class SequentialSVClustering;
       public:
         typedef OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT > OctreeSequentialT;
         typedef boost::shared_ptr<OctreeSequentialT> Ptr;
@@ -118,6 +119,12 @@ namespace pcl
           * \note This overrides the addPointsFromInputCloud from the OctreePointCloud class */
         void
         addPointsFromInputCloud ();
+
+        /**
+         * @brief updateChangedLeaves
+         */
+        void
+        updateChangedLeaves ();
 
         /** \brief Update the octree by removing the matched occluded clouds */
         void
@@ -242,7 +249,7 @@ namespace pcl
           * \param[in] camera_key Key which specifies the camera position
           * \returns 0 if path to camera is free, otherwise distance to occluder (in # of voxels) */
         std::pair<float, LeafContainerT*>
-        testForOcclusion (boost::shared_ptr<OctreeKey> &key, LeafContainerT *leaf_container ) const;
+        testForOcclusion (boost::shared_ptr<OctreeKey> &key) const;
 
         void
         parallelAddPoint ();
@@ -300,13 +307,6 @@ namespace pcl
 
         //Stores the camera position which is used for occlusion testing
         OctreeKey camera_key_;
-
-        //Mutex lock to prevent simultaneous leaf creation
-        boost::mutex create_mutex_;
-
-        boost::mutex new_mutex_;
-
-        boost::mutex delete_mutex_;
 
         //Maximum number of threads to use
         int threads_;

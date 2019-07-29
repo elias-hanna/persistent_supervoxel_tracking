@@ -244,6 +244,7 @@ namespace pcl
     {
       float color_dist =  (leaf->getData ().rgb_
                            - leaf->getData ().previous_rgb_).norm () / 255.0f;
+      //    float cos_angle_normal = 1.0f - (leaf->getData ().voxel_centroid_.getNormalVector4fMap ().dot (leaf->getData ().previous_centroid_.getNormalVector4fMap ()));
 
       return color_dist;
     }
@@ -256,7 +257,8 @@ namespace pcl
     {
       float color_dist =  (leaf->getData ().rgb_
                            - leaf->getData ().previous_rgb_).norm () / 255.0f;
-      
+//      float cos_angle_normal = 1.0f - (leaf->getData ().voxel_centroid_.getNormalVector4fMap ().dot (leaf->getData ().previous_centroid_.getNormalVector4fMap ()));
+
       return color_dist;
     }
 

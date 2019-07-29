@@ -153,7 +153,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
     //Check if the leaf had no points observed this frame
     else if (leaf_container->getPointCounter () == 0)
     {
-      std::pair<float, LeafContainerT*> occluder_pair = testForOcclusion (key, leaf_container);
+      std::pair<float, LeafContainerT*> occluder_pair = testForOcclusion (key);
       //If occluded (distance to occluder != 0)
       if (occluder_pair.first != 0.0f)
       {
@@ -250,6 +250,34 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   assert (leaf_vector_.size () == this->getLeafCount ());
   assert (key_vector_.size () == leaf_vector_.size ());
 
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
+pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::updateChangedLeaves ()
+{
+  for (size_t i = 0; i < leaf_vector_.size (); ++i)
+  {
+    LeafContainerT *leaf_container = leaf_vector_[i];
+    boost::shared_ptr<OctreeKey> key = key_vector_[i];
+    if (leaf_container->getPointCounter () != 0) //Existed in previous frame and observed so just update data
+    {
+      if ( diff_func_ && diff_func_ (leaf_container) > difference_threshold_)
+      {
+        leaf_container->getData ().setChanged (true);
+      }
+      else
+      {
+        leaf_container->getData ().setChanged (false);
+      }
+    }
+  }
+
+  //All keys which were stored in new_frame_pairs_ are valid, so this is now true for leaf_key_vec_
+  stored_keys_valid_ = true;
+  //Final check to make sure they match the leaf_key_vector is correct size after deletion
+  assert (leaf_vector_.size () == this->getLeafCount ());
+  assert (key_vector_.size () == leaf_vector_.size ());
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -501,7 +529,6 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   LeafContainerT* container = this->findLeaf(*key);
   if (container == 0) //If not, do a lock and add the leaf
   {
-    boost::mutex::scoped_lock create_mutex_;
     //Check again, since another thread might have created between the first find and now
     container = this->findLeaf(*key);
     if (container == 0)
@@ -575,7 +602,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> std::pair<float, LeafContainerT*>
-pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::testForOcclusion (boost::shared_ptr<OctreeKey> &key, LeafContainerT *leaf_container) const
+pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::testForOcclusion (boost::shared_ptr<OctreeKey> &key) const
 {
   OctreeKey kinect_min_z;
   PointT min_z_pt;
@@ -634,354 +661,6 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   //If we didn't run into a leaf on the way to this camera, it can't be occluded.
   return std::make_pair (0,occluder);
 }
-
-//template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
-//pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::parallelUpdate ( LeafVectorT* leaves, KeyVectorT* keys, LeafVectorT* delete_leaves, std::vector<OctreeKey>* delete_keys, LeafVectorT* new_leaves, KeyVectorT* new_keys)//typename OctreeSequentialT::Ptr sequential_octree, typename VoxelCloudT::Ptr unlabeled_voxel_centroid_cloud, typename VoxelCloudT::Ptr voxel_centroid_cloud)
-//{
-//    tbb::parallel_for(tbb::blocked_range<size_t>(0, leaf_vector_.size()),
-//                      [=](const tbb::blocked_range<size_t>& r)
-//    {
-//        for (size_t i = r.begin() ; i < r.end(); ++i)
-//        {
-//          LeafContainerT *leaf_container = (*leaves)[i];
-//          boost::shared_ptr<OctreeKey> key = (*keys)[i];
-//          //If no neighbors probably noise - delete
-//          if (leaf_container->getNumNeighbors () <= 1)
-//          {
-//              boost::mutex::scoped_lock (delete_mutex_);
-//              delete_leaves->push_back (leaf_container);
-//              delete_keys->push_back (*key);
-//          }
-//          //Check if the leaf had no points observed this frame
-//          else if (leaf_container->getPointCounter () == 0)
-//          {
-//            std::pair<float, LeafContainerT*> occluder_pair = testForOcclusion (key, leaf_container);
-//            //If occluded (distance to occluder != 0)
-//            if (occluder_pair.first != 0.0f)
-//            {
-//              //This is basically a test to remove extra voxels caused by objects moving towards the camera
-//              if (occluder_pair.first <= 4.0f || (testForNewNeighbors(leaf_container)
-//                                                    && leaf_container->getData().frame_occluded_ != occluder_pair.second->getData().frame_occluded_))
-//              {
-//                boost::mutex::scoped_lock (delete_mutex_);
-//                delete_leaves->push_back (leaf_container);
-//                delete_keys->push_back (*key);
-//              }
-//              else //otherwise add it to the current leaves and revert it to last timestep (since current has nothing in it)
-//              { //TODO Maybe maintain a separate list of occluded leaves?
-//                {
-//                  boost::mutex::scoped_lock (new_mutex_);
-//                  new_leaves->push_back (leaf_container);
-//                  new_keys->push_back (key);
-//                }
-//                if (leaf_container->getData ().frame_occluded_ == 0)
-//                  leaf_container->getData ().frame_occluded_ = frame_counter_;
-//                //We don't need to do this anymore since we're using the accumulator
-//                //leaf_container->getData ().revertToLastPoint ();
-//              }
-//            }
-//            else //not occluded & not observed safe to delete
-//            {
-//              boost::mutex::scoped_lock (delete_mutex_);
-//              delete_leaves->push_back (leaf_container);
-//              delete_keys->push_back (*key);
-//            }
-//          }
-//          else //Existed in previous frame and observed so just update data
-//          {
-//            {
-//              boost::mutex::scoped_lock (new_mutex_);
-//              new_leaves->push_back (leaf_container);
-//              new_keys->push_back (key);
-//            }
-//            //Compute the data from the points added to the voxel container
-//            leaf_container->computeData ();
-//            //Not occluded
-//            leaf_container->getData ().frame_occluded_ = 0;
-//            //Use the difference function to check if the leaf has changed
-//            if ( diff_func_ && diff_func_ (leaf_container) > difference_threshold_)
-//            {
-//              leaf_container->getData ().setChanged (true);
-//              // leaf_container->getData ().label_ = -1;
-//            }
-//            else
-//            {
-//              leaf_container->getData ().setChanged (false);
-//            }
-//          }
-//        }
-//    }
-//    );
-//}
-
-//template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
-//pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::parallelAddPoint ()//typename OctreeSequentialT::Ptr sequential_octree, typename VoxelCloudT::Ptr unlabeled_voxel_centroid_cloud, typename VoxelCloudT::Ptr voxel_centroid_cloud)
-//{
-//    tbb::parallel_for(tbb::blocked_range<size_t>(0, input_->points.size()),
-//                      [=](const tbb::blocked_range<size_t>& r)
-//    {
-//        for (size_t i = r.begin () ; i != r.end (); ++i)
-//        {
-//            addPointSequential (static_cast<unsigned int> (i));
-//        }
-//    }
-//    );
-//}
-
-/*
-////////////////////////////////////////////////////////////////////////////////
-// The rest are container explicit instantiations for XYZ, XYZRGB, and XYZRGBA  point types ///
-////////////////////////////////////////////////////////////////////////////////
-namespace pcl
-{
-  namespace octree
-  {
-    /// XYZRGBA  ////////////////////////////////////////
-    template<>
-    float
-    OctreePointCloudSequential<PointXYZRGBA,
-    OctreePointCloudSequentialContainer <PointXYZRGBA, SequentialVoxelData<PointXYZRGBA> > >
-    ::SeqVoxelDataDiff (const OctreePointCloudSequentialContainer <PointXYZRGBA, SequentialVoxelData<PointXYZRGBA> >* leaf)
-    {
-      float temp1 = leaf->getData ().rgb_.norm () ;
-      float temp2 = leaf->getData ().rgb_old_.norm ();
-      
-      return 1.0f - (leaf->getData ().rgb_ / temp1).dot ((leaf->getData ().rgb_old_ / temp2));
-    }
-    
-    template<>
-    void
-    OctreePointCloudSequentialContainer<PointXYZRGBA,
-    SequentialVoxelData<PointXYZRGBA> >::addPoint (const pcl::PointXYZRGBA &new_point)
-    {
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      num_points_++;
-      
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[0] += new_point.x;
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[1] += new_point.y;
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[2] += new_point.z;
-      
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.rgb_[0] += static_cast<float> (new_point.r);
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.rgb_[1] += static_cast<float> (new_point.g);
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.rgb_[2] += static_cast<float> (new_point.b);
-    }
-    
-    template<> void
-    OctreePointCloudSequentialContainer<PointXYZRGBA,
-    SequentialVoxelData<PointXYZRGBA> >::computeData ()
-    {
-      data_.rgb_ /= static_cast<float> (num_points_ + num_prev_);
-      data_.xyz_ /= static_cast<float> (num_points_ + num_prev_);
-    }
-    
-    template<> void
-    SequentialVoxelData<PointXYZRGBA>::getPoint (pcl::PointXYZRGBA &point_arg ) const
-    {
-      point_arg.rgba = static_cast<uint32_t>(rgb_[0]) << 16 |
-      static_cast<uint32_t>(rgb_[1]) << 8 |
-      static_cast<uint32_t>(rgb_[2]);
-      point_arg.x = xyz_[0];
-      point_arg.y = xyz_[1];
-      point_arg.z = xyz_[2];
-    }
-    
-    /// XYZRGBNormal  ////////////////////////////////////////
-    template<>
-    float
-    OctreePointCloudSequential<PointXYZRGBNormal,
-    OctreePointCloudSequentialContainer <PointXYZRGBNormal, SequentialVoxelData<PointXYZRGBNormal> > >
-    ::SeqVoxelDataDiff (const OctreePointCloudSequentialContainer <PointXYZRGBNormal, SequentialVoxelData<PointXYZRGBNormal> >* leaf)
-    {
-      float temp1 = leaf->getData ().rgb_.norm () ;
-      float temp2 = leaf->getData ().rgb_old_.norm ();
-      
-      return 1.0f - (leaf->getData ().rgb_ / temp1).dot ((leaf->getData ().rgb_old_ / temp2));
-    }
-    
-    template<>
-    void
-    OctreePointCloudSequentialContainer<PointXYZRGBNormal,
-    SequentialVoxelData<PointXYZRGBNormal> >::addPoint (const pcl::PointXYZRGBNormal &new_point)
-    {
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      num_points_++;
-      
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[0] += new_point.x;
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[1] += new_point.y;
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[2] += new_point.z;
-      
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.rgb_[0] += static_cast<float> (new_point.r);
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.rgb_[1] += static_cast<float> (new_point.g);
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.rgb_[2] += static_cast<float> (new_point.b);
-    }
-    
-    template<> void
-    OctreePointCloudSequentialContainer<PointXYZRGBNormal,
-    SequentialVoxelData<PointXYZRGBNormal> >::computeData ()
-    {
-      data_.rgb_ /= static_cast<float> (num_points_ + num_prev_);
-      data_.xyz_ /= static_cast<float> (num_points_ + num_prev_);
-    }
-    
-    template<> void
-    SequentialVoxelData<PointXYZRGBNormal>::getPoint (pcl::PointXYZRGBNormal &point_arg ) const
-    {
-      point_arg.rgba = static_cast<uint32_t>(rgb_[0]) << 16 |
-      static_cast<uint32_t>(rgb_[1]) << 8 |
-      static_cast<uint32_t>(rgb_[2]);
-      point_arg.x = xyz_[0];
-      point_arg.y = xyz_[1];
-      point_arg.z = xyz_[2];
-    }
-    // XYZRGB ///////////////////////////////
-    template<>
-    float
-    OctreePointCloudSequential<PointXYZRGB,
-    OctreePointCloudAdjacencyContainer <PointXYZRGB, SequentialVoxelData<PointXYZRGB> > >
-    ::SeqVoxelDataDiff (const OctreePointCloudAdjacencyContainer <PointXYZRGB, SequentialVoxelData<PointXYZRGB> >* leaf)
-    {
-      return (leaf->getData ().rgb_ - leaf->getData ().rgb_old_).norm () / 255.0f;
-    }
-    
-    template<>
-    void
-    OctreePointCloudAdjacencyContainer<PointXYZRGB,
-    SequentialVoxelData<PointXYZRGB> >::addPoint (const pcl::PointXYZRGB &new_point)
-    {
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      ++num_points_;
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[0] += new_point.x;
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[1] += new_point.y;
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[2] += new_point.z;
-      
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.rgb_[0] += static_cast<float> (new_point.r);
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.rgb_[1] += static_cast<float> (new_point.g);
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.rgb_[2] += static_cast<float> (new_point.b);
-    }
-    
-    template<> void
-    OctreePointCloudAdjacencyContainer<PointXYZRGB,
-    SequentialVoxelData<PointXYZRGB> >::computeData ()
-    {
-      data_.rgb_ /= static_cast<float> (num_points_+num_prev_);
-      data_.xyz_ /= static_cast<float> (num_points_+num_prev_);
-    }
-    
-    template<> void
-    SequentialVoxelData<PointXYZRGB>::getPoint (pcl::PointXYZRGB &point_arg ) const
-    {
-      // In XYZRGB you need to do this nonsense
-      uint32_t temp_rgb = static_cast<uint32_t>(rgb_[0]) << 16 |
-      static_cast<uint32_t>(rgb_[1]) << 8 |
-      static_cast<uint32_t>(rgb_[2]);
-      point_arg.rgb = *reinterpret_cast<float*> (&temp_rgb);
-      point_arg.x = xyz_[0];
-      point_arg.y = xyz_[1];
-      point_arg.z = xyz_[2];
-    }
-    
-    // XYZ /////////////////////////////////////////
-    template<>
-    void
-    OctreePointCloudAdjacencyContainer<PointXYZ,
-    SequentialVoxelData<PointXYZ> >::addPoint (const pcl::PointXYZ &new_point)
-    {
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      ++num_points_;
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[0] += new_point.x;
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[1] += new_point.y;
-      #ifdef _OPENMP
-      #pragma omp atomic
-      #endif
-      data_.xyz_[2] += new_point.z;
-    }
-    
-    template<> void
-    OctreePointCloudAdjacencyContainer<PointXYZ,
-    SequentialVoxelData<PointXYZ> >::computeData ()
-    {
-      data_.xyz_ /= static_cast<float> (num_points_ + num_prev_);
-    }
-    
-    template<> void
-    SequentialVoxelData<PointXYZ>::getPoint (pcl::PointXYZ &point_arg ) const
-    {
-      point_arg.x = xyz_[0];
-      point_arg.y = xyz_[1];
-      point_arg.z = xyz_[2];
-    }
-    
-  }
-}
-*/
 
 #define PCL_INSTANTIATE_OctreePointCloudSequential(T) template class PCL_EXPORTS pcl::octree::OctreePointCloudSequential<T>;
 

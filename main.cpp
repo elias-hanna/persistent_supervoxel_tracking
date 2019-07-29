@@ -15,8 +15,8 @@
 #include "libs/libfreenect2pclgrabber/include/k2g.h"
 // Macros
 #define N_DATA 2
-#define USE_KINECT 1
-#define KINECT_V2 1
+#define USE_KINECT 0
+#define KINECT_V2 0
 // Types
 typedef pcl::tracking::ParticleXYZRPY StateT;
 typedef pcl::PointXYZRGBA PointT;
@@ -43,6 +43,7 @@ static bool show_disappeared = false;
 static bool show_transforms = false;
 static bool show_unlabeled = false;
 static uint64_t frame_count = 0;
+static pcl::GlasbeyLUT colors;
 
 void
 keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event)
@@ -102,7 +103,6 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer,
   // Show the segmentation
   else
   {
-    pcl::GlasbeyLUT colors;
     for (const auto& sv: supervoxel_clusters)
     {
       size_t obj_nb = 0;

@@ -55,6 +55,9 @@
 #include <pcl/registration/correspondence_estimation.h>
 #include <pcl/filters/statistical_outlier_removal.h>
 #include <pcl/features/fpfh_omp.h>
+#include <pcl/filters/voxel_grid_occlusion_estimation.h>
+#include <boost/thread/mutex.hpp>
+//#include <pcl/octree/octree_key.h>
 //#include <pcl/kdtree/kdtree_flann.h>
 //// Turn off the verbose
 //#undef OBJ_REC_RANSAC_VERBOSE
@@ -437,7 +440,7 @@ namespace pcl
       /** \brief This method filters out the keypoints where the descriptor don't hold enough information
        *  \note Should the descriptor always hold good information ? Don't know if it is a metaparameter
        * problem related to the use of the RIFTEstimation class or if it is normal. */
-      void
+      pcl::PointIndicesPtr
       filterKeypoints(const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > to_filter_keypoints,
                       std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr >& filtered_keypoints) const;
 
@@ -506,12 +509,22 @@ namespace pcl
       void
       removeInliers (KeypointFeatureT& current_keypoints, const std::vector<int>& to_remove_indices);
 
+      /**
+       * @brief testForOcclusionCriterium
+       * @param to_match_indices
+       * @param matches_indices
+       * @return
+       */
+      bool
+      testForOcclusionCriterium (const std::vector<int>& to_match_indices,
+                                 const std::vector<int>& matches_indices) const;
+
       /** \brief This method uses a RANSAC based algorithm to find matches to disappeared/occluded supervoxels from previous
        * frame that woud appear in the current frame
        * \param[out] matches found in the form of an STL unordered map with label as key and pcl::recognition::ObjRecRANSAC::Output as value
        */
       std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>
-      getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters);
+                                                               getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters);
 
       /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
        * \note This overload compute keypoints and descriptors from the previous supervoxel clusters
@@ -688,6 +701,23 @@ namespace pcl
 
       /** \brief Contains the Normals of the voxel centroid Cloud of the previous frame*/
       typename NormalCloud::Ptr prev_voxel_centroid_normal_cloud_;
+
+      /**
+       * @brief prev_keypoints_location_
+       */
+      std::unordered_map<uint32_t, pcl::PointCloud<pcl::PointXYZ>::Ptr>
+      prev_keypoints_location_;
+      /**
+       * @brief curr_keypoints_location_
+       */
+      pcl::PointCloud<pcl::PointXYZ>::Ptr
+      curr_keypoints_location_;
+
+      /**
+       * @brief prev_occluded_voxels
+       */
+      std::vector<bool>
+      prev_occluded_voxels;
 
       /** \brief Contains the Normals of the input Cloud */
       typename NormalCloud::ConstPtr input_normals_;
@@ -889,14 +919,14 @@ namespace pcl
           }
 
           RANSACRegistration (const KeypointFeatureT& current_keypoints,
-                         const KeypointMapFeatureT::value_type& pair,
-                         const int min_number_of_inliers,
-                         const SequentialSVMapT& supervoxel_clusters,
-                         const typename PointCloudT::Ptr prev_voxel_centroid_cloud,
-                         const typename PointCloudT::Ptr unlabeled_voxel_centroid_cloud,
-                         const typename PointCloudT::Ptr voxel_centroid_cloud,
-                         const float threshold,
-                         const float seed_resolution):
+                              const KeypointMapFeatureT::value_type& pair,
+                              const int min_number_of_inliers,
+                              const SequentialSVMapT& supervoxel_clusters,
+                              const typename PointCloudT::Ptr prev_voxel_centroid_cloud,
+                              const typename PointCloudT::Ptr unlabeled_voxel_centroid_cloud,
+                              const typename PointCloudT::Ptr voxel_centroid_cloud,
+                              const float threshold,
+                              const float seed_resolution):
             current_keypoints_ (current_keypoints),
             pair_ (pair),
             min_number_of_inliers_ (min_number_of_inliers),
