@@ -49,10 +49,15 @@ namespace pcl
 { 
     namespace octree
     {
-        /** \brief @b Octree sequential adjacency leaf container class- stores a list of pointers to neighbors, number of points added, and a DataT value
-         *    \note This class implements a leaf node that stores pointers to neighboring leaves
-         *   \note This class also has a virtual computeData function, which is called by octreePointCloudAdjacency::addPointsFromInputCloud.
-         *   \note You should make explicit instantiations of it for your pointtype/datatype combo (if needed) see supervoxel_clustering.hpp for an example of this
+        /** \brief @b Octree sequential adjacency leaf container class- stores
+         * a list of pointers to neighbors, number of points added, and a DataT value
+         *    \note This class implements a leaf node that stores pointers to
+         * neighboring leaves
+         *   \note This class also has a virtual computeData function, which
+         * is called by octreePointCloudAdjacency::addPointsFromInputCloud.
+         *   \note You should make explicit instantiations of it for your
+         * pointtype/datatype combo (if needed) see supervoxel_clustering.hpp
+         * for an example of this
          */
         template<typename PointInT, typename DataT = PointInT>
         class OctreePointCloudSequentialContainer : public OctreeContainerBase
@@ -60,15 +65,18 @@ namespace pcl
                 template<typename T, typename U, typename V>
                 friend class OctreePointCloudSequential;
             public:
-                typedef std::set<OctreePointCloudSequentialContainer*> NeighborListT;
+                typedef
+                std::set<OctreePointCloudSequentialContainer*> NeighborListT;
                 //iterators to neighbors
                 typedef typename NeighborListT::iterator iterator;
                 inline iterator begin () { return (neighbors_.begin ()); }
                 inline iterator end ()   { return (neighbors_.end ()); }
                 //const iterators to neighbors
                 typedef typename NeighborListT::const_iterator const_iterator;
-                inline const_iterator cbegin () const { return (neighbors_.begin ()); }
-                inline const_iterator cend () const  { return (neighbors_.end ()); }
+                inline const_iterator cbegin () const
+                { return (neighbors_.begin ()); }
+                inline const_iterator cend () const
+                { return (neighbors_.end ()); }
                 //size of neighbors
                 inline size_t size () const { return neighbors_.size (); }
 
@@ -88,13 +96,15 @@ namespace pcl
                 virtual OctreePointCloudSequentialContainer *
                 deepCopy () const
                 {
-                    OctreePointCloudSequentialContainer *new_container = new OctreePointCloudSequentialContainer;
+                    OctreePointCloudSequentialContainer* new_container =
+                        new OctreePointCloudSequentialContainer;
                     new_container->setNeighbors (this->neighbors_);
                     new_container->setPointCounter (this->num_points_);
                     return new_container;
                 }
 
-                /** \brief Resets the number of points contributing to this leaf to 0*/
+                /** \brief Resets the number of points contributing to this
+                 * leaf to 0*/
                 void
                 resetPointCount ()
                 {
@@ -102,15 +112,18 @@ namespace pcl
                     num_points_ = 0;
                 }
 
-                /** \brief Gets the number of points contributing to this leaf */
+                /** \brief Gets the number of points contributing to this leaf
+*/
                 int
                 getPointCounter () const { return num_points_; }
 
-                /** \brief Returns a reference to the data member to access it without copying */
+                /** \brief Returns a reference to the data member to access
+                 * it without copying */
                 DataT&
                 getData () { return data_; }
 
-                /** \brief Returns a const reference to the data member to access it without copying */
+                /** \brief Returns a const reference to the data member to
+                 * access it without copying */
                 const DataT&
                 getData () const { return data_; }
 
@@ -139,7 +152,8 @@ namespace pcl
                 }
 
                 /** \brief Add new point to container- this just counts points
-                 * \note To actually store data in the leaves, need to specialize this
+                 * \note To actually store data in the leaves, need to
+                 * specialize this
                  * for your point and data type as in supervoxel_clustering.hpp
                  */
                 // param[in] new_point the new point to add
@@ -150,14 +164,16 @@ namespace pcl
                     ++num_points_;
                 }
 
-                /** \brief Function for working on data added. Base implementation does nothing
+                /** \brief Function for working on data added. Base
+                 * implementation does nothing
                  */
                 void
                 computeData ()
                 {
                 }
 
-                /** \brief Sets the number of points contributing to this leaf */
+                /** \brief Sets the number of points contributing to this leaf
+*/
                 void
                 setPointCounter (int points_arg) { num_points_ = points_arg; }
 

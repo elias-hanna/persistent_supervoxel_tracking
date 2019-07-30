@@ -41,9 +41,11 @@
 
 #include "../octree_pointcloud_sequential.h"
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> 
-pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::OctreePointCloudSequential (const double resolution_arg)
+pcl::octree::
+OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>
+::OctreePointCloudSequential (const double resolution_arg)
   : OctreePointCloud<PointT, LeafContainerT, BranchContainerT
     , OctreeBase<LeafContainerT, BranchContainerT> > (resolution_arg),
     diff_func_ (0),
@@ -56,21 +58,26 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
 
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
-pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::addPointsFromInputCloud ()
+///////////////////////////////////////////////////////////////////////////////
+template<typename PointT, typename LeafContainerT, typename BranchContainerT>
+void
+pcl::octree::
+OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>
+::addPointsFromInputCloud ()
 {
   ++frame_counter_;
   nb_deleted_ = 0;
   //If we're empty, just use plain version
   if (leaf_vector_.size () == 0 )
   {
-    OctreePointCloud<PointT, LeafContainerT, BranchContainerT>::addPointsFromInputCloud ();
+    OctreePointCloud<PointT, LeafContainerT, BranchContainerT>::
+        addPointsFromInputCloud ();
     LeafContainerT *leaf_container;
-    typename OctreeSequentialT::LeafNodeDepthFirstIterator leaf_itr;
+    typename OctreeSequentialT::LeafNodeDepthFirstIterator
+        leaf_itr = this->leaf_depth_begin ();
     leaf_vector_.reserve (this->getLeafCount ());
     key_vector_.reserve (this->getLeafCount ());
-    for ( leaf_itr = this->leaf_depth_begin () ; leaf_itr != this->leaf_depth_end (); ++leaf_itr)
+    for (; leaf_itr != this->leaf_depth_end (); ++leaf_itr)
     {
       boost::shared_ptr<OctreeKey> leaf_key (new OctreeKey);
       *leaf_key = leaf_itr.getCurrentOctreeKey ();
@@ -89,8 +96,9 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   //Otherwise, start sequential update
   //Go through and reset all the containers for the new frame.
   LeafContainerT *leaf_container;
-  typename OctreeSequentialT::LeafNodeDepthFirstIterator leaf_itr;
-  for (leaf_itr = this->leaf_depth_begin (); leaf_itr != this->leaf_depth_end (); ++leaf_itr)
+  typename OctreeSequentialT::LeafNodeDepthFirstIterator
+      leaf_itr = this->leaf_depth_begin ();
+  for (; leaf_itr != this->leaf_depth_end (); ++leaf_itr)
   {
     leaf_container = &(leaf_itr.getLeafContainer ());
     leaf_container->getData ().prepareForNewFrame ();
@@ -109,12 +117,14 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   // #endif
   for (size_t i = 0; i < input_->points.size (); i++)
   {
-    // Add points to the octree. If point fall within an existing leaf, add it to the leaf, otherwise create a new leaf
-    // The new points (those that created new leaves) are stored within new_leaves_
+    // Add points to the octree. If point fall within an existing leaf, add it
+    // to the leaf, otherwise create a new leaf
+    // The new points (those that created new leaves) are stored within
+    // new_leaves_
     addPointSequential (static_cast<unsigned int> (i));
   }
   // parallelAddPoint();
-  //If Geometrically new - need to reciprocally update neighbors and compute Data
+  //If Geometrically new need to reciprocally update neighbors and compute Data
   //New frame leaf/key vectors now contain only the geometric new leaves
   for (size_t i = 0; i < new_leaves_.size (); ++i)
   {
@@ -125,11 +135,8 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   // This will store old leaves that will need to be deleted
   LeafVectorT delete_leaves;
   std::vector<OctreeKey> delete_keys;
-  delete_leaves.reserve (this->getLeafCount () / 4); //Probably a reasonable upper bound
+  delete_leaves.reserve (this->getLeafCount () / 4); // Reasonable upper bound
   delete_keys.reserve (this->getLeafCount () / 4);
-
-
-  // parallelUpdate (&leaf_vector_, &key_vector_, &delete_leaves, &delete_keys, &new_leaves_, &new_keys_);
 
   //Now we need to iterate through all leaves from previous frame -
   // #ifdef _OPENMP
@@ -252,7 +259,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
 
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::updateChangedLeaves ()
 {
@@ -280,7 +287,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   assert (key_vector_.size () == leaf_vector_.size ());
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::updateOctreeFromMatchedClouds (std::vector<uint32_t> labels)
 {
@@ -361,7 +368,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   assert (key_vector_.size () == leaf_vector_.size ());
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::defineBoundingBoxOnInputCloud ()
 {
@@ -413,7 +420,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   OctreePointCloudT::defineBoundingBox (minX, minY, minZ, maxX, maxY, maxZ);
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::deleteVoxelAtPoint (const PointT& point_arg)
 {
@@ -446,7 +453,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   ++nb_deleted_;
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::genOctreeKeyforPoint (const PointT& point_arg,OctreeKey & key_arg) const
 {
@@ -476,7 +483,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   }
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::addPointIdx (const int pointIdx_arg)
 {
@@ -495,7 +502,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   container->addPoint (point);
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> LeafContainerT*
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::getLeafContainerAtPoint (const PointT& point_arg) const
 {
@@ -510,7 +517,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
 }
 
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::addPointSequential (const int point_index_arg)
 {
@@ -546,7 +553,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   container->addPoint (point);
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> void
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::computeNeighbors (OctreeKey &key_arg, LeafContainerT* leaf_container)
 { 
@@ -585,7 +592,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   }
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> bool
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::testForNewNeighbors (const LeafContainerT* leaf_container) const
 {
@@ -599,7 +606,7 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
 }
 
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 template<typename PointT, typename LeafContainerT, typename BranchContainerT> std::pair<float, LeafContainerT*>
 pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>::testForOcclusion (boost::shared_ptr<OctreeKey> &key) const
 {

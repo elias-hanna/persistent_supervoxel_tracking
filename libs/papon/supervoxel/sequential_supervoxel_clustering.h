@@ -57,14 +57,11 @@
 #include <pcl/features/fpfh_omp.h>
 #include <pcl/filters/voxel_grid_occlusion_estimation.h>
 #include <boost/thread/mutex.hpp>
-//#include <pcl/octree/octree_key.h>
-//#include <pcl/kdtree/kdtree_flann.h>
-//// Turn off the verbose
-//#undef OBJ_REC_RANSAC_VERBOSE
 
 namespace pcl
 {
-  /** \brief Supervoxel container class - stores a cluster extracted using supervoxel clustering
+  /** \brief Supervoxel container class - stores a cluster extracted using
+   * supervoxel clustering
    */
   template <typename PointT>
   class SequentialSV : public Supervoxel<PointT>
@@ -84,17 +81,14 @@ namespace pcl
       typedef boost::shared_ptr<SequentialSV> Ptr;
       typedef boost::shared_ptr<const SequentialSV> ConstPtr;
 
-      /** \brief The normal calculated for the voxels contained in the supervoxel */
-      //            pcl::Normal normal_;
+      /** \brief The normal calculated for the voxels contained in the
+       *  supervoxel */
       using Supervoxel<PointT>::normal_;
       /** \brief The centroid of the supervoxel - average voxel */
-      //            pcl::PointXYZRGBA centroid_;
       using Supervoxel<PointT>::centroid_;
       /** \brief A Pointcloud of the voxels in the supervoxel */
-      //            typename pcl::PointCloud<PointT>::Ptr voxels_;
       using Supervoxel<PointT>::voxels_;
-      /** \brief A Pointcloud of the normals for the points in the supervoxel */
-      //            typename pcl::PointCloud<Normal>::Ptr normals_;
+      /** \brief A Pointcloud of the normals for the points in the supervoxel*/
       using Supervoxel<PointT>::normals_;
       /** \brief A Pointcloud of the voxels with xyzrgb+label data in it */
       pcl::PointCloud<pcl::PointXYZRGBL> labeled_voxels_;
@@ -106,8 +100,10 @@ namespace pcl
       EIGEN_MAKE_ALIGNED_OPERATOR_NEW
   };
 
-  /** \brief NEW MESSAGE
-   *  \author Jeremie Papon (jpapon@gmail.com)
+  /** \brief Class for persistent supervoxel clustering, a clustering spanning
+   * on multiples frames of a same scene
+   *  \author Elias Hanna (h.elias@hotmail.fr) and Jeremie Papon
+   * (jpapon@gmail.com)
    *  \ingroup segmentation
    */
   template <typename PointT>
@@ -118,7 +114,8 @@ namespace pcl
       friend class RansacSupervoxelTracker;
     public:
       // Attributes used for visualization
-      std::unordered_map<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>> lines_;
+      std::unordered_map<uint32_t, std::pair<Eigen::Vector4f, Eigen::Vector4f>>
+      lines_;
       std::vector<int> previous_keypoints_indices_;
       std::vector<int> current_keypoints_indices_;
       std::vector<pcl::PointXYZRGBA> centroid_of_dynamic_svs_;
@@ -126,7 +123,8 @@ namespace pcl
       std::vector<uint32_t>
       getLabelColors () const;
 
-      /** \brief VoxelData is a structure used for storing data within a pcl::octree::OctreePointCloudAdjacencyContainer
+      /** \brief VoxelData is a structure used for storing data within a
+       * pcl::octree::OctreePointCloudAdjacencyContainer
        *  \note It stores xyz, rgb, normal, distance, an index, and an owner.
        */
       class SequentialVoxelData : public SupervoxelClustering<PointT>::VoxelData
@@ -193,13 +191,13 @@ namespace pcl
           //          using SupervoxelClustering<PointT>::VoxelData::getNormal;
 
           /** \brief Gets the data of in the form of a point
-           *  \param[out] point_arg Will contain the point value of the voxeldata
+           *  \param[out] point_arg Contain the point value of the voxeldata
            */
           void
           getPoint (PointT &point_arg) const;
 
           /** \brief Gets the data of in the form of a normal
-           *  \param[out] normal_arg Will contain the normal value of the voxeldata
+           *  \param[out] normal_arg Contain the normal value of the voxeldata
            */
           void
           getNormal (Normal &normal_arg) const;
@@ -227,15 +225,22 @@ namespace pcl
           EIGEN_MAKE_ALIGNED_OPERATOR_NEW
       };
 
-      typedef pcl::octree::OctreePointCloudSequentialContainer<PointT, SequentialVoxelData> LeafContainerT;
+      typedef
+      pcl::octree::OctreePointCloudSequentialContainer
+      <PointT, SequentialVoxelData> LeafContainerT;
       typedef std::vector <LeafContainerT*> LeafVectorT;
-      typedef std::map<uint32_t,typename Supervoxel<PointT>::Ptr> SupervoxelMapT;
-      typedef std::map<uint32_t,typename SequentialSV<PointT>::Ptr> SequentialSVMapT;
+      typedef
+      std::map<uint32_t,typename Supervoxel<PointT>::Ptr> SupervoxelMapT;
+      typedef
+      std::map<uint32_t,typename SequentialSV<PointT>::Ptr> SequentialSVMapT;
 
       typedef typename pcl::PointCloud<PointT> PointCloudT;
       typedef typename pcl::PointCloud<Normal> NormalCloud;
-      typedef typename pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT> OctreeSequentialT;
-      typedef typename pcl::octree::OctreePointCloudSearch <PointT> OctreeSearchT;
+      typedef
+      typename pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT>
+      OctreeSequentialT;
+      typedef
+      typename pcl::octree::OctreePointCloudSearch <PointT> OctreeSearchT;
       typedef typename pcl::search::KdTree<PointT> KdTreeT;
       typedef boost::shared_ptr<std::vector<int> > IndicesPtr;
 
@@ -247,13 +252,15 @@ namespace pcl
       // Feature space search types
       typedef pcl::FPFHSignature33 FeatureT;
       typedef flann::L1<float> DistanceT; // Manhattan distance
-      //      typedef flann::L2<float> DistanceT;
-      //      typedef flann::KL_Divergence<float> DistanceT; // Kullback Leibler divergence ~= distance
-      //      typedef flann::MinkowskiDistance<float> DistanceT;
-      //      typedef flann::HistIntersectionDistance<float> DistanceT;
+      //typedef flann::L2<float> DistanceT;
+      //typedef flann::KL_Divergence<float> DistanceT;
+      //typedef flann::MinkowskiDistance<float> DistanceT;
+      //typedef flann::HistIntersectionDistance<float> DistanceT;
       typedef pcl::PointCloud<FeatureT> PointCloudFeatureT;
-      typedef std::pair<pcl::IndicesPtr, PointCloudFeatureT::Ptr> KeypointFeatureT;
-      typedef std::unordered_map<uint32_t, KeypointFeatureT> KeypointMapFeatureT;
+      typedef
+      std::pair<pcl::IndicesPtr, PointCloudFeatureT::Ptr> KeypointFeatureT;
+      typedef
+      std::unordered_map<uint32_t, KeypointFeatureT> KeypointMapFeatureT;
 
       // Search and index types
       typedef search::FlannSearch<FeatureT, DistanceT> SearchT;
@@ -265,20 +272,29 @@ namespace pcl
       using pcl::PCLBase <PointT>::deinitCompute;
       using pcl::PCLBase <PointT>::input_;
 
-      typedef boost::adjacency_list<boost::setS, boost::setS, boost::undirectedS, uint32_t, float> VoxelAdjacencyList;
+      typedef
+      boost::adjacency_list
+      <boost::setS, boost::setS, boost::undirectedS, uint32_t, float>
+      VoxelAdjacencyList;
       typedef VoxelAdjacencyList::vertex_descriptor VoxelID;
       typedef VoxelAdjacencyList::edge_descriptor EdgeID;
 
     public:
       /** \brief Constructor that sets default values for member variables.
        *  \param[in] voxel_resolution The resolution (in meters) of voxels used
-       *  \param[in] seed_resolution The average size (in meters) of resulting supervoxels
-       *  \param[in] use_single_camera_transform Set to true if point density in cloud falls off with distance from origin (such as with a cloud coming from one stationary camera), set false if input cloud is from multiple captures from multiple locations.
+       *  \param[in] seed_resolution The average size (in meters) of resulting
+       * supervoxels
+       *  \param[in] use_single_camera_transform Set to true if point density
+       * in cloud falls off with distance from origin (such as with a cloud
+       * coming from one stationary camera), set false if input cloud is from
+       * multiple captures from multiple locations.
        */
-      SequentialSVClustering (float voxel_resolution, float seed_resolution, bool use_single_camera_transform = true, bool prune_close_seeds=true);
+      SequentialSVClustering (float voxel_resolution, float seed_resolution,
+                              bool use_single_camera_transform = true,
+                              bool prune_close_seeds=true);
 
-      /** \brief This destructor destroys the cloud, normals and search method used for
-       * finding neighbors. In other words it frees memory.
+      /** \brief This destructor destroys the cloud, normals and search
+       * method used for finding neighbors. In other words it frees memory.
        */
       virtual
       ~SequentialSVClustering ();
@@ -312,21 +328,29 @@ namespace pcl
       setNormalImportance (float val);
 
       /** \brief Set whether or not to use the single camera transform
-       *  \note By default it will be used for organized clouds, but not for unorganized - this parameter will override that behavior
-       *  The single camera transform scales bin size so that it increases exponentially with depth (z dimension).
-       *  This is done to account for the decreasing point density found with depth when using an RGB-D camera.
-       *  Without the transform, beyond a certain depth adjacency of voxels breaks down unless the voxel size is set to a large value.
-       *  Using the transform allows preserving detail up close, while allowing adjacency at distance.
+       *  \note By default it will be used for organized clouds, but not for
+       * unorganized - this parameter will override that behavior
+       *  The single camera transform scales bin size so that it increases
+       * exponentially with depth (z dimension).
+       *  This is done to account for the decreasing point density found with
+       * depth when using an RGB-D camera.
+       *  Without the transform, beyond a certain depth adjacency of voxels
+       * breaks down unless the voxel size is set to a large value.
+       *  Using the transform allows preserving detail up close, while allowing
+       *  adjacency at distance.
        *  The specific transform used here is:
        *  x /= z; y /= z; z = ln(z);
-       *  This transform is applied when calculating the octree bins in OctreePointCloudAdjacency
+       *  This transform is applied when calculating the octree bins in
+       * OctreePointCloudAdjacency
        */
       void
       setUseSingleCameraTransform (bool val);
 
       /** \brief Set to ignore input normals and calculate normals internally
-       *  \note Default is False - ie, SupervoxelClustering will use normals provided in PointT if there are any
-       *  \note You should only need to set this if eg PointT=PointXYZRGBNormal but you don't want to use the normals it contains
+       *  \note Default is False - ie, SupervoxelClustering will use normals
+       * provided in PointT if there are any
+       *  \note You should only need to set this if eg PointT=PointXYZRGBNormal
+       *  but you don't want to use the normals it contains
        */
       void
       setIgnoreInputNormals (bool val);
@@ -335,9 +359,11 @@ namespace pcl
       int
       getMaxLabel () const;
 
-      /** \brief This method launches the segmentation algorithm and returns the supervoxels that were
+      /** \brief This method launches the segmentation algorithm and returns
+       * the supervoxels that were
        * obtained during the segmentation.
-       * \param[out] supervoxel_clusters A map of labels to pointers to supervoxel structures
+       * \param[out] supervoxel_clusters A map of labels to pointers to
+       * supervoxel structures
        */
       virtual void
       extract (SequentialSVMapT &supervoxel_clusters);
@@ -348,7 +374,8 @@ namespace pcl
       virtual void
       setInputCloud (const typename pcl::PointCloud<PointT>::ConstPtr& cloud);
 
-      /** \brief This method sets the normals to be used for supervoxels (should be same size as input cloud)
+      /** \brief This method sets the normals to be used for supervoxels
+       *  (should be same size as input cloud)
       * \param[in] normal_cloud The input normals
       */
       virtual void
@@ -389,155 +416,187 @@ namespace pcl
       pcl::PointCloud<pcl::Normal>::Ptr
       getUnlabeledVoxelNormalCloud () const;
 
-      /** \brief Gets the adjacency list (Boost Graph library) which gives connections between supervoxels
-       *  \param[out] adjacency_list_arg BGL graph where supervoxel labels are vertices, edges are touching relationships
+      /** \brief Gets the adjacency list (Boost Graph library) which gives
+       * connections between supervoxels
+       *  \param[out] adjacency_list_arg BGL graph where supervoxel labels are
+       * vertices, edges are touching relationships
        */
       void
-      getSupervoxelAdjacency (std::multimap<uint32_t, uint32_t> &label_adjacency) const;
+      getSupervoxelAdjacency
+      (std::multimap<uint32_t, uint32_t>& label_adjacency) const;
 
       /**
-       * @brief getMovingParts
-       * @return
+       * \brief getMovingParts
+       * \return
        */
       std::vector<uint32_t>
       getMovingParts ()
       { return moving_parts_; }
 
       /**
-       * @brief getToResetParts
-       * @return
+       * \brief getToResetParts
+       * \return
        */
       std::vector<uint32_t>
       getToResetParts ()
       { return to_reset_parts_; }
 
       /**
-       * @brief getMovingParts
-       * @param vec
+       * \brief getMovingParts
+       * \param vec
        */
       void
       getMovingParts (std::vector<uint32_t>& vec)
       { vec = moving_parts_; }
 
       /**
-       * @brief getToResetParts
-       * @param vec
+       * \brief getToResetParts
+       * \param vec
        */
       void
       getToResetParts (std::vector<uint32_t>& vec)
       { vec = to_reset_parts_; }
 
     private:
-      /** \brief This method initializes the label_colors_ vector (assigns random colors to labels)
-       * \note Checks to see if it is already big enough - if so, does not reinitialize it
+      /** \brief This method initializes the label_colors_ vector
+       * (assigns random colors to labels)
+       * \note Checks to see if it is already big enough - if so, does not
+       * reinitialize it
        */
       void
       initializeLabelColors ();
 
-      /** \brief This method computes the FPFH descriptors of the given keypoints
+      /** \brief This method computes the FPFH descriptors of the given
+       * keypoints
        * \param[out] A pointcloud of the descriptors
        */
       std::pair< pcl::IndicesPtr, pcl::PointCloud<pcl::FPFHSignature33>::Ptr >
-      computeFPFHDescriptors (const PointCloudScale sift_result, const typename PointCloudT::Ptr cloud, const NormalCloud::Ptr normals) const;
+      computeFPFHDescriptors (const PointCloudScale sift_result,
+                              const typename PointCloudT::Ptr cloud,
+                              const NormalCloud::Ptr normals) const;
 
-      /** \brief This method filters out the keypoints where the descriptor don't hold enough information
-       *  \note Should the descriptor always hold good information ? Don't know if it is a metaparameter
-       * problem related to the use of the RIFTEstimation class or if it is normal. */
+      /** \brief This method filters out the keypoints where the descriptor
+       * don't hold enough information
+       *  \note Should the descriptor always hold good information ? Don't
+       * know if it is a metaparameter
+       * problem related to the use of the RIFTEstimation class or if it is
+       * normal. */
       pcl::PointIndicesPtr
-      filterKeypoints(const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > to_filter_keypoints,
-                      std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr >& filtered_keypoints) const;
+      filterKeypoints
+      (const std::pair<pcl::IndicesPtr, PointCloudFeatureT::Ptr>
+       to_filter_keypoints,
+       std::pair<pcl::IndicesPtr, PointCloudFeatureT::Ptr>& filtered_keypoints)
+      const;
 
       /** \brief This method compute key points matches between an input vector
        * of potential inliers and points in an input pointcloud
-       * \note This method set priority over order of preference rather than distance
-       * between point and potential match
-       * \param[out] The vector of point indices that match the input indices, out[i]=-1 if no
-       * matching point was found */
+       * \note This method set priority over order of preference rather than
+       * distance between point and potential match
+       * \param[out] The vector of point indices that match the input indices,
+       * out[i]=-1 if no matching point was found */
       std::vector<int>
-      computeKeypointsMatches(const std::vector<int> to_match_indices, const PointCloudFeatureT to_match_feature_cloud,
-                              const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > indices_point_pair);
+      computeKeypointsMatches(const std::vector<int> to_match_indices,
+                              const PointCloudFeatureT to_match_feature_cloud,
+                              const std::pair <pcl::IndicesPtr,
+                              PointCloudFeatureT::Ptr > indices_point_pair);
 
-      /** \brief Init the computation, update the sequential octree, perform global check to see wether supervoxel have changed
-       * more than their half and finally compute the voxel data to be used to determine the supervoxel seeds
+      /** \brief Init the computation, update the sequential octree, perform
+       * global check to see wether supervoxel have changed more than their
+       * half and finally compute the voxel data to be used to determine the
+       * supervoxel seeds
        */
       void
       buildVoxelCloud ();
 
-      /** \brief Update the sequential octree, perform global check to see wether supervoxel have changed
-       * more than their half and finally compute the voxel data to be used to determine the supervoxel seeds
+      /** \brief Update the sequential octree, perform global check to see
+       * wether supervoxel have changed more than their half and finally
+       * compute the voxel data to be used to determine the supervoxel seeds
        */
       bool
       prepareForSegmentation ();
 
-      /** \brief This method unlabels changed voxels between two frames and also unlabel more than half
-       * changing supervoxels
+      /** \brief This method unlabels changed voxels between two frames and
+       * also unlabel more than half changing supervoxels
        */
       void
       globalCheck ();
 
-      /** \brief This method computes the label of the occluded/disappeared supervoxels
-       * and returns a vector of those labels
+      /** \brief This method computes the label of the occluded/disappeared
+       * supervoxels and returns a vector of those labels
        * \param[out] Vector of labels (uint32_t) */
       std::vector<uint32_t>
       getLabelsOfDynamicSV (SequentialSVMapT &supervoxel_clusters);
 
-      /** \brief This methode removes the keypoints from current_keypoints given by the indices
-       * in to remove_indices */
+      /** \brief This methode removes the keypoints from current_keypoints
+       * given by the indices in to remove_indices */
       void
-      removeInliers (KeypointFeatureT& current_keypoints, const std::vector<int>& to_remove_indices);
+      removeInliers (KeypointFeatureT& current_keypoints,
+                     const std::vector<int>& to_remove_indices);
 
       /**
-       * @brief testForOcclusionCriterium
-       * @param to_match_indices
-       * @param matches_indices
-       * @return
+       * \brief testForOcclusionCriterium
+       * \param to_match_indices
+       * \param matches_indices
+       * \return
        */
       bool
       testForOcclusionCriterium (const std::vector<int>& to_match_indices,
-                                 const std::vector<int>& matches_indices) const;
+                                 const std::vector<int>& matches_indices)const;
 
-      /** \brief This method uses a RANSAC based algorithm to find matches to disappeared/occluded supervoxels from previous
-       * frame that woud appear in the current frame
-       * \param[out] matches found in the form of an STL unordered map with label as key and pcl::recognition::ObjRecRANSAC::Output as value
+      /** \brief This method uses a RANSAC based algorithm to find matches to
+       * disappeared/occluded supervoxels from previous frame that woud appear
+       *  in the current frame
+       * \param[out] matches found in the form of an STL unordered map with
+       * label as key and pcl::recognition::ObjRecRANSAC::Output as value
        */
       std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>
       getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters);
 
-      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
-       * \note This overload compute keypoints and descriptors from the previous supervoxel clusters
-       * and stores it as a map linking the supervoxel label to a pair of indices (the keypoints in previous voxel cloud)
-       * and the corresponding descriptor cloud (FeatureT points) */
+      /** \brief This method computes the keypoints and the descriptors of the
+       * input point cloud and stores them
+       * \note This overload compute keypoints and descriptors from the
+       * previous supervoxel clusters and stores it as a map linking the
+       * supervoxel label to a pair of indices (the keypoints in previous voxel
+       *  cloud) and the corresponding descriptor cloud (FeatureT points) */
       void
-      computeUniformKeypointsAndFPFHDescriptors(SequentialSVMapT &supervoxel_clusters,
-                                                KeypointMapFeatureT &previous_keypoints,
-                                                int min_nb_of_keypoints);
+      computeUniformKeypointsAndFPFHDescriptors
+      (SequentialSVMapT &supervoxel_clusters,
+       KeypointMapFeatureT &previous_keypoints,
+       int min_nb_of_keypoints);
 
-      /** \brief This method computes the keypoints and the descriptors of the input point cloud and stores them
-       * \note This overload compute keypoints and descriptors from the current unlabeled voxel cloud
-       * and stores it as a pair of indices (the keypoints in previous voxel cloud)
-       * and the corresponding descriptor cloud (FeatureT points) */
+      /** \brief This method computes the keypoints and the descriptors of the
+       * input point cloud and stores them
+       * \note This overload compute keypoints and descriptors from the current
+       *  unlabeled voxel cloud and stores it as a pair of indices
+       * (the keypoints in previous voxel cloud) and the corresponding
+       * descriptor cloud (FeatureT points) */
       void
-      computeUniformKeypointsAndFPFHDescriptors(KeypointFeatureT &current_keypoints,
-                                                int min_nb_of_keypoints);
+      computeUniformKeypointsAndFPFHDescriptors
+      (KeypointFeatureT &current_keypoints,
+       int min_nb_of_keypoints);
 
-      /** \brief This method randomly draws nb_to_sample points from indices (and removes them
-       * from indices and cloud) and stores them accordingly in potential_inliers and
-       * potential_inliers_feature_cloud. */
+      /** \brief This method randomly draws nb_to_sample points from indices
+       * (and removes them from indices and cloud) and stores them accordingly
+       * in potential_inliers and potential_inliers_feature_cloud. */
       void
-      samplePotentialInliers(std::vector<int> &indices,
-                             PointCloudFeatureT::Ptr &cloud,
-                             std::vector<int> &potential_inliers,
-                             PointCloudFeatureT::Ptr &potential_inliers_feature_cloud,
-                             int nb_to_sample);
+      samplePotentialInliers
+      (std::vector<int> &indices,
+       PointCloudFeatureT::Ptr &cloud,
+       std::vector<int> &potential_inliers,
+       PointCloudFeatureT::Ptr &potential_inliers_feature_cloud,
+       int nb_to_sample);
 
-      /** \brief Compute the rigid transformation between the corresponding point indices
-       * designated by the two input vectors. Uses TransformationSVD to do so
+      /** \brief Compute the rigid transformation between the corresponding
+       * point indices designated by the two input vectors. Uses
+       * TransformationSVD to do so
        * \note could add an overloaded method to accept pcl::Correspondances */
       Eigen::Matrix<float, 4, 4>
-      computeRigidTransformation(std::vector<int> prev_indices, std::vector<int> curr_indices);
+      computeRigidTransformation(std::vector<int> prev_indices,
+                                 std::vector<int> curr_indices);
 
-      /** \brief This method search in spatial_neighbours which ones are keypoints and
-       * adds them as inliers if their distance in feature space is below a threshold */
+      /** \brief This method search in spatial_neighbours which ones are
+       * keypoints and adds them as inliers if their distance in feature space
+       * is below a threshold */
       void
       findInliers(const PointCloudFeatureT::Ptr &search_cloud,
                   const std::vector<int> &spatial_neighbors,
@@ -547,66 +606,79 @@ namespace pcl
                   PointCloudFeatureT::Ptr &potential_inliers_cloud,
                   float threshold, float* err);
 
-      /** \brief Compute the voxel data (index of each voxel in the octree and normal of each voxel) */
+      /** \brief Compute the voxel data (index of each voxel in the octree and
+       * normal of each voxel) */
       void
       computeVoxelData ();
 
       /**
-       * @brief computeUnlabeledVoxelCentroidNormalCloud
+       * \brief computeUnlabeledVoxelCentroidNormalCloud
        */
       void
       computeUnlabeledVoxelCentroidNormalCloud ();
 
 
-      /** \brief Compute the voxel data (index of each voxel in the octree and normal of each voxel) */
+      /** \brief Compute the voxel data (index of each voxel in the octree and
+       * normal of each voxel) */
       void
       updatePrevClouds ();
 
-      /** \brief Update the unlabeled voxel and normal cloud by removing the indices given by indices
-        * and using pcl::StatisticalOutlierRemoval to remove noise from unlabeled voxel cloud */
+      /** \brief Update the unlabeled voxel and normal cloud by removing the
+       * indices given by indices
+        * and using pcl::StatisticalOutlierRemoval to remove noise from
+        * unlabeled voxel cloud */
       void
       updateUnlabeledCloud ();
 
-      /** \brief Update the unlabeled normal cloud by removing the indices given by indices */
+      /** \brief Update the unlabeled normal cloud by removing the indices
+       * given by indices */
       void
       updateUnlabeledNormalCloud (const IndicesConstPtr indices);
 
-      /** \brief This method compute the normal of each leaf belonging to the sequential octree
+      /** \brief This method compute the normal of each leaf belonging to
+       * the sequential octree
        */
       void
       parallelComputeNormals ();
 
       /**
-       * @brief computeUnlabeledVoxelCentroidCloud
+       * \brief computeUnlabeledVoxelCentroidCloud
        */
       void
       computeUnlabeledVoxelCentroidCloud ();
 
       /** \brief Distance function used for comparing voxelDatas */
       float
-      sequentialVoxelDataDistance (const SequentialVoxelData &v1, const SequentialVoxelData &v2) const;
+      sequentialVoxelDataDistance (const SequentialVoxelData &v1,
+                                   const SequentialVoxelData &v2) const;
 
-      /** \brief Transform function used to normalize voxel density versus distance from camera */
+      /** \brief Transform function used to normalize voxel density versus
+       * distance from camera */
       void
       transformFunction (PointT &p);
 
-      /** \brief This roughly founds the same seeding points as those from the previous frame
+      /** \brief This roughly founds the same seeding points as those from
+       * the previous frame
        *  \param[out] existing_seed_indices The selected leaf indices
        */
       void
-      getPreviousSeedingPoints (SequentialSVMapT &supervoxel_clusters, std::vector<int> &existing_seed_indices);
+      getPreviousSeedingPoints (SequentialSVMapT &supervoxel_clusters,
+                                std::vector<int> &existing_seed_indices);
 
-      /** \brief This method finds seeding points, then prune the seeds that are too close to existing ones
-       * and stores seeds that are going to be used to supervoxelize the scene in seed_indices
+      /** \brief This method finds seeding points, then prune the seeds that
+       * are too close to existing ones and stores seeds that are going to be
+       * used to supervoxelize the scene in seed_indices
        */
       void
-      pruneSeeds (std::vector<int> &existing_seed_indices, std::vector<int> &seed_indices);
+      pruneSeeds (std::vector<int> &existing_seed_indices,
+                  std::vector<int> &seed_indices);
 
       /** \brief This performs the superpixel evolution */
       void
       expandSupervoxels ( int depth );
 
-      /** \brief Constructs the map of supervoxel clusters from the internal supervoxel helpers */
+      /** \brief Constructs the map of supervoxel clusters from the internal
+       * supervoxel helpers */
       void
       makeSupervoxels (SequentialSVMapT &supervoxel_clusters);
 
@@ -634,10 +706,12 @@ namespace pcl
       /** \brief Octree Sequential structure with leaves at voxel resolution */
       typename OctreeSequentialT::Ptr prev_sequential_octree_;
 
-      /** \brief Contains the Voxelized centroid cloud of the unlabeled voxels */
+      /** \brief Contains the Voxelized centroid cloud of the unlabeled
+       * voxels */
       typename PointCloudT::Ptr unlabeled_voxel_centroid_cloud_;
 
-      /** \brief Contains the Normals of the current unlabeled voxel centroid cloud */
+      /** \brief Contains the Normals of the current unlabeled voxel centroid
+       * cloud */
       typename NormalCloud::Ptr unlabeled_voxel_centroid_normal_cloud_;
 
       /** \brief Contains the Voxelized centroid Cloud */
@@ -646,16 +720,17 @@ namespace pcl
       /** \brief Contains the Voxelized centroid Cloud of the previous frame*/
       typename PointCloudT::Ptr prev_voxel_centroid_cloud_;
 
-      /** \brief Contains the Normals of the voxel centroid Cloud of the previous frame*/
+      /** \brief Contains the Normals of the voxel centroid Cloud of the
+       * previous frame*/
       typename NormalCloud::Ptr prev_voxel_centroid_normal_cloud_;
 
       /**
-       * @brief prev_keypoints_location_
+       * \brief prev_keypoints_location_
        */
       std::unordered_map<uint32_t, pcl::PointCloud<pcl::PointXYZ>::Ptr>
       prev_keypoints_location_;
       /**
-       * @brief curr_keypoints_location_
+       * \brief curr_keypoints_location_
        */
       pcl::PointCloud<pcl::PointXYZ>::Ptr
       curr_keypoints_location_;
@@ -672,13 +747,14 @@ namespace pcl
       /** \brief Importance of similarity in normals for clustering */
       float normal_importance_;
 
-      /** \brief Option to ignore normals in input Pointcloud. Defaults to false */
+      /** \brief Option to ignore normals in input Pointcloud. Defaults to
+       * false */
       bool ignore_input_normals_;
 
       /** \brief Whether or not to use the transform compressing depth in Z
        *  This is only checked if it has been manually set by the user.
-       *  The default behavior is to use the transform for organized, and not for unorganized.
-       */
+       *  The default behavior is to use the transform for organized, and not
+       * for unorganized. */
       bool use_single_camera_transform_;
 
       /** \brief Whether to use default transform behavior or not */
@@ -702,23 +778,30 @@ namespace pcl
       {
         public:
 
-          /** \brief Comparator for LeafContainerT pointers - used for sorting set of leaves
-         * \note Compares by index in the overall leaf_vector. Order isn't important, so long as it is fixed.
+          /** \brief Comparator for LeafContainerT pointers - used for sorting
+           * set of leaves
+         * \note Compares by index in the overall leaf_vector. Order isn't
+         * important, so long as it is fixed.
          */
           struct compareLeaves
           {
-              bool operator() (LeafContainerT* const &left, LeafContainerT* const &right) const
+              bool operator() (LeafContainerT* const &left,
+                               LeafContainerT* const &right) const
               {
                 const SequentialVoxelData& leaf_data_left = left->getData ();
                 const SequentialVoxelData& leaf_data_right = right->getData ();
                 return leaf_data_left.idx_ < leaf_data_right.idx_;
               }
           };
-          typedef std::set<LeafContainerT*, typename SequentialSupervoxelHelper::compareLeaves> LeafSetT;
+          typedef
+          std::set
+          <LeafContainerT*, typename SequentialSupervoxelHelper::compareLeaves>
+          LeafSetT;
           typedef typename LeafSetT::iterator iterator;
           typedef typename LeafSetT::const_iterator const_iterator;
 
-          SequentialSupervoxelHelper (uint32_t label, SequentialSVClustering* parent_arg):
+          SequentialSupervoxelHelper (uint32_t label,
+                                      SequentialSVClustering* parent_arg):
             label_ (label),
             parent_ (parent_arg),
             is_new_ (true)
@@ -753,7 +836,8 @@ namespace pcl
           void
           getNormals (typename pcl::PointCloud<Normal>::Ptr &normals) const;
 
-          typedef float (SequentialSVClustering::*DistFuncPtr)(const SequentialVoxelData &v1, const SequentialVoxelData &v2);
+          typedef float (SequentialSVClustering::*DistFuncPtr)
+          (const SequentialVoxelData &v1, const SequentialVoxelData &v2);
 
           uint32_t
           getLabel () const
@@ -778,9 +862,9 @@ namespace pcl
           void
           getRGB (uint32_t &rgba) const
           {
-            rgba = static_cast<uint32_t>( centroid_.rgb_[0]) << 16 |
-                                                                static_cast<uint32_t>(centroid_.rgb_[1]) << 8 |
-                                                                                                            static_cast<uint32_t>(centroid_.rgb_[2]);
+            rgba = static_cast<uint32_t>( centroid_.rgb_[0])
+                << 16 | static_cast<uint32_t>(centroid_.rgb_[1])
+                << 8 | static_cast<uint32_t>(centroid_.rgb_[2]);
           }
 
           void
@@ -816,7 +900,9 @@ namespace pcl
       };
 
       //Make boost::ptr_list can access the private class SupervoxelHelper
-      friend void boost::checked_delete<> (const typename pcl::SequentialSVClustering<PointT>::SequentialSupervoxelHelper *);
+      friend void boost::checked_delete<>
+      (const typename
+       pcl::SequentialSVClustering<PointT>::SequentialSupervoxelHelper *);
 
       typedef boost::ptr_list<SequentialSupervoxelHelper> HelperListT;
       HelperListT supervoxel_helpers_;
@@ -844,7 +930,7 @@ namespace pcl
             min_number_of_inliers_ (x.min_number_of_inliers_),
             supervoxel_clusters_ (x.supervoxel_clusters_),
             prev_voxel_centroid_cloud_ (x.prev_voxel_centroid_cloud_),
-            unlabeled_voxel_centroid_cloud_ (x.unlabeled_voxel_centroid_cloud_),
+            unlabeled_voxel_centroid_cloud_(x.unlabeled_voxel_centroid_cloud_),
             voxel_centroid_cloud_ (x.voxel_centroid_cloud_),
             threshold_ (x.threshold_),
             seed_resolution_ (x.seed_resolution_),
@@ -865,9 +951,12 @@ namespace pcl
                               const KeypointMapFeatureT::value_type& pair,
                               const int min_number_of_inliers,
                               const SequentialSVMapT& supervoxel_clusters,
-                              const typename PointCloudT::Ptr prev_voxel_centroid_cloud,
-                              const typename PointCloudT::Ptr unlabeled_voxel_centroid_cloud,
-                              const typename PointCloudT::Ptr voxel_centroid_cloud,
+                              const typename PointCloudT::Ptr
+                              prev_voxel_centroid_cloud,
+                              const typename PointCloudT::Ptr
+                              unlabeled_voxel_centroid_cloud,
+                              const typename PointCloudT::Ptr
+                              voxel_centroid_cloud,
                               const float threshold,
                               const float seed_resolution):
             current_keypoints_ (current_keypoints),
@@ -887,11 +976,13 @@ namespace pcl
           samplePotentialInliers(std::vector<int> &indices,
                                  PointCloudFeatureT::Ptr &cloud,
                                  std::vector<int> &potential_inliers,
-                                 PointCloudFeatureT::Ptr &potential_inliers_feature_cloud,
+                                 PointCloudFeatureT::Ptr&
+                                 potential_inliers_feature_cloud,
                                  int nb_to_sample);
 
           Eigen::Matrix<float, 4, 4>
-          computeRigidTransformation(std::vector<int> prev_indices, std::vector<int> curr_indices);
+          computeRigidTransformation(std::vector<int> prev_indices,
+                                     std::vector<int> curr_indices);
 
           void
           findInliers(const PointCloudFeatureT::Ptr &search_cloud,
@@ -903,8 +994,12 @@ namespace pcl
                       float threshold, float* err);
 
           std::vector<int>
-          computeKeypointsMatches(const std::vector<int> to_match_indices, const PointCloudFeatureT to_match_feature_cloud,
-                                  const std::pair <pcl::IndicesPtr, PointCloudFeatureT::Ptr > indices_point_pair);
+          computeKeypointsMatches(const std::vector<int> to_match_indices,
+                                  const PointCloudFeatureT
+                                  to_match_feature_cloud,
+                                  const std::pair
+                                  <pcl::IndicesPtr, PointCloudFeatureT::Ptr>
+                                  indices_point_pair);
       };
 
     public:

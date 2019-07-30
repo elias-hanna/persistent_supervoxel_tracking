@@ -49,8 +49,10 @@ POINT_CLOUD_REGISTER_POINT_STRUCT (Histogram<32>,
 // Instantiations of specific point types
 template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::L2<float>>;
 template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::L1<float>>;
-template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::KL_Divergence<float>>;
-template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::HistIntersectionDistance<float>>;
+template class pcl::search::FlannSearch
+<pcl::Histogram<32>, flann::KL_Divergence<float>>;
+template class pcl::search::FlannSearch
+<pcl::Histogram<32>, flann::HistIntersectionDistance<float>>;
 
 #include <pcl/point_types.h>
 #include <pcl/impl/instantiate.hpp>
@@ -68,7 +70,9 @@ namespace pcl
     // Explicit overloads for XYZ types
     template<>
     void
-    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZ,pcl::SequentialSVClustering<pcl::PointXYZ>::SequentialVoxelData>::addPoint (const pcl::PointXYZ &new_point)
+    pcl::octree::OctreePointCloudSequentialContainer
+    <pcl::PointXYZ,pcl::SequentialSVClustering<pcl::PointXYZ>
+    ::SequentialVoxelData>::addPoint (const pcl::PointXYZ &new_point)
     {
       ++num_points_;
       //Same as before here
@@ -80,7 +84,9 @@ namespace pcl
     // Explicit overloads for XYZRGB types
     template<>
     void
-    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGB,pcl::SequentialSVClustering<pcl::PointXYZRGB>::SequentialVoxelData>::addPoint (const pcl::PointXYZRGB &new_point)
+    pcl::octree::OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGB,pcl::SequentialSVClustering<pcl::PointXYZRGB>
+    ::SequentialVoxelData>::addPoint (const pcl::PointXYZRGB &new_point)
     {
       ++num_points_;
       //Same as before here
@@ -96,7 +102,9 @@ namespace pcl
     // Explicit overloads for XYZRGBA types
     template<>
     void
-    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBA,pcl::SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData>::addPoint (const pcl::PointXYZRGBA &new_point)
+    pcl::octree::OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGBA,pcl::SequentialSVClustering<pcl::PointXYZRGBA>
+    ::SequentialVoxelData>::addPoint (const pcl::PointXYZRGBA &new_point)
     {
       ++num_points_;
       //Same as before here
@@ -112,7 +120,9 @@ namespace pcl
     // Explicit overloads for XYZRGBL types
     template<>
     void
-    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBL,pcl::SequentialSVClustering<pcl::PointXYZRGBL>::SequentialVoxelData>::addPoint (const pcl::PointXYZRGBL &new_point)
+    pcl::octree::OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGBL,pcl::SequentialSVClustering<pcl::PointXYZRGBL>
+    ::SequentialVoxelData>::addPoint (const pcl::PointXYZRGBL &new_point)
     {
       ++num_points_;
       //Same as before here
@@ -128,7 +138,9 @@ namespace pcl
     // Explicit overloads for XYZRGBNormal types
     template<>
     void
-    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBNormal,pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData>::addPoint (const pcl::PointXYZRGBNormal &new_point)
+    pcl::octree::OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGBNormal,pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>
+    ::SequentialVoxelData>::addPoint (const pcl::PointXYZRGBNormal &new_point)
     {
       ++num_points_;
       //Same as before here
@@ -148,7 +160,9 @@ namespace pcl
 
     //Explicit overloads for XYZ types
     template<> void
-    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZ,pcl::SequentialSVClustering<pcl::PointXYZ>::SequentialVoxelData>::computeData ()
+    pcl::octree::OctreePointCloudSequentialContainer
+    <pcl::PointXYZ,pcl::SequentialSVClustering<pcl::PointXYZ>
+    ::SequentialVoxelData>::computeData ()
     {
       data_.xyz_[0] /= (static_cast<float> (num_points_));
       data_.xyz_[1] /= (static_cast<float> (num_points_));
@@ -157,7 +171,9 @@ namespace pcl
 
     //Explicit overloads for XYZRGB types
     template<> void
-    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGB,pcl::SequentialSVClustering<pcl::PointXYZRGB>::SequentialVoxelData>::computeData ()
+    pcl::octree::OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGB,pcl::SequentialSVClustering<pcl::PointXYZRGB>
+    ::SequentialVoxelData>::computeData ()
     {
       data_.rgb_[0] /= (static_cast<float> (num_points_));
       data_.rgb_[1] /= (static_cast<float> (num_points_));
@@ -169,7 +185,9 @@ namespace pcl
 
     //Explicit overloads for XYZRGBL types
     template<> void
-    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBL,pcl::SequentialSVClustering<pcl::PointXYZRGBL>::SequentialVoxelData>::computeData ()
+    pcl::octree::OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGBL,pcl::SequentialSVClustering<pcl::PointXYZRGBL>
+    ::SequentialVoxelData>::computeData ()
     {
       data_.rgb_[0] /= (static_cast<float> (num_points_));
       data_.rgb_[1] /= (static_cast<float> (num_points_));
@@ -181,7 +199,9 @@ namespace pcl
 
     //Explicit overloads for XYZRGBA types
     template<> void
-    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBA,pcl::SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData>::computeData ()
+    pcl::octree::OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGBA,pcl::SequentialSVClustering<pcl::PointXYZRGBA>
+    ::SequentialVoxelData>::computeData ()
     {
       data_.rgb_[0] /= (static_cast<float> (num_points_));
       data_.rgb_[1] /= (static_cast<float> (num_points_));
@@ -193,7 +213,9 @@ namespace pcl
 
     //Explicit overloads for XYZRGBANormal types
     template<> void
-    pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBNormal,pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData>::computeData ()
+    pcl::octree::OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGBNormal,pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>
+    ::SequentialVoxelData>::computeData ()
     {
       data_.rgb_[0] /= (static_cast<float> (num_points_));
       data_.rgb_[1] /= (static_cast<float> (num_points_));
@@ -209,76 +231,107 @@ namespace pcl
     
     //Explicit overloads for XYZ types
     template<> float
-    OctreePointCloudSequential<pcl::PointXYZ,
-    OctreePointCloudSequentialContainer <pcl::PointXYZ, SequentialSVClustering<pcl::PointXYZ>::SequentialVoxelData > >
-    ::SeqVoxelDataDiff (const OctreePointCloudSequentialContainer <pcl::PointXYZ, SequentialSVClustering<pcl::PointXYZ>::SequentialVoxelData >* leaf)
+    OctreePointCloudSequential
+    <pcl::PointXYZ,OctreePointCloudSequentialContainer
+    <pcl::PointXYZ,
+    SequentialSVClustering<pcl::PointXYZ>::SequentialVoxelData>>
+    ::SeqVoxelDataDiff
+    (const OctreePointCloudSequentialContainer
+     <pcl::PointXYZ, SequentialSVClustering<pcl::PointXYZ>
+     ::SequentialVoxelData>* leaf)
     {
-      float cos_angle_normal = 1.0f - (leaf->getData ().normal_.dot (leaf->getData ().previous_normal_));
+      float cos_angle_normal = 1.0f -
+          (leaf->getData ().normal_.dot (leaf->getData ().previous_normal_));
       return cos_angle_normal;
     }
 
     //Explicit overloads for XYZRGB types
     template<> float
-    OctreePointCloudSequential<pcl::PointXYZRGB,
-    OctreePointCloudSequentialContainer <pcl::PointXYZRGB, SequentialSVClustering<pcl::PointXYZRGB>::SequentialVoxelData > >
-    ::SeqVoxelDataDiff (const OctreePointCloudSequentialContainer <pcl::PointXYZRGB, SequentialSVClustering<pcl::PointXYZRGB>::SequentialVoxelData >* leaf)
+    OctreePointCloudSequential
+    <pcl::PointXYZRGB, OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGB,
+    SequentialSVClustering<pcl::PointXYZRGB>::SequentialVoxelData>>
+    ::SeqVoxelDataDiff
+    (const OctreePointCloudSequentialContainer
+     <pcl::PointXYZRGB, SequentialSVClustering<pcl::PointXYZRGB>
+     ::SequentialVoxelData >* leaf)
     {
       float color_dist =  (leaf->getData ().rgb_
                            - leaf->getData ().previous_rgb_).norm () / 255.0f;
-      float cos_angle_normal = 1.0f - (leaf->getData ().normal_.dot (leaf->getData ().previous_normal_));
+      float cos_angle_normal = 1.0f -
+          (leaf->getData ().normal_.dot (leaf->getData ().previous_normal_));
       return cos_angle_normal;
     }
 
     //Explicit overloads for XYZRGBA types
     template<> float
-    OctreePointCloudSequential<pcl::PointXYZRGBA,
-    OctreePointCloudSequentialContainer <pcl::PointXYZRGBA, SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData > >
-    ::SeqVoxelDataDiff (const OctreePointCloudSequentialContainer <pcl::PointXYZRGBA, SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData >* leaf)
+    OctreePointCloudSequential
+    <pcl::PointXYZRGBA, OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGBA,
+    SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData>>
+    ::SeqVoxelDataDiff
+    (const OctreePointCloudSequentialContainer
+     <pcl::PointXYZRGBA, SequentialSVClustering<pcl::PointXYZRGBA>
+     ::SequentialVoxelData >* leaf)
     {
       float color_dist =  (leaf->getData ().rgb_
                            - leaf->getData ().previous_rgb_).norm () / 255.0f;
-      float cos_angle_normal = 1.0f - (leaf->getData ().normal_.dot (leaf->getData ().previous_normal_));
+      float cos_angle_normal = 1.0f -
+          (leaf->getData ().normal_.dot (leaf->getData ().previous_normal_));
       return cos_angle_normal;
     }
 
     //Explicit overloads for XYZRGBL types
     template<> float
-    OctreePointCloudSequential<pcl::PointXYZRGBL,
-    OctreePointCloudSequentialContainer <pcl::PointXYZRGBL, SequentialSVClustering<pcl::PointXYZRGBL>::SequentialVoxelData > >
-    ::SeqVoxelDataDiff (const OctreePointCloudSequentialContainer <pcl::PointXYZRGBL, SequentialSVClustering<pcl::PointXYZRGBL>::SequentialVoxelData >* leaf)
+    OctreePointCloudSequential
+    <pcl::PointXYZRGBL, OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGBL,
+    SequentialSVClustering<pcl::PointXYZRGBL>::SequentialVoxelData > >
+    ::SeqVoxelDataDiff
+    (const OctreePointCloudSequentialContainer
+     <pcl::PointXYZRGBL, SequentialSVClustering<pcl::PointXYZRGBL>
+     ::SequentialVoxelData >* leaf)
     {
       float color_dist =  (leaf->getData ().rgb_
                            - leaf->getData ().previous_rgb_).norm () / 255.0f;
-      float cos_angle_normal = 1.0f - (leaf->getData ().normal_.dot (leaf->getData ().previous_normal_));
+      float cos_angle_normal = 1.0f -
+          (leaf->getData ().normal_.dot (leaf->getData ().previous_normal_));
       return cos_angle_normal;
     }
 
     //Explicit overloads for XYZRGBNormal types
     template<> float
-    OctreePointCloudSequential<pcl::PointXYZRGBNormal,
-    OctreePointCloudSequentialContainer <pcl::PointXYZRGBNormal, SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData > >
-    ::SeqVoxelDataDiff (const OctreePointCloudSequentialContainer <pcl::PointXYZRGBNormal, SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData >* leaf)
+    OctreePointCloudSequential
+    <pcl::PointXYZRGBNormal, OctreePointCloudSequentialContainer
+    <pcl::PointXYZRGBNormal,
+    SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData > >
+    ::SeqVoxelDataDiff
+    (const OctreePointCloudSequentialContainer
+     <pcl::PointXYZRGBNormal, SequentialSVClustering<pcl::PointXYZRGBNormal>
+     ::SequentialVoxelData >* leaf)
     {
       float color_dist =  (leaf->getData ().rgb_
                            - leaf->getData ().previous_rgb_).norm () / 255.0f;
-      float cos_angle_normal = 1.0f - (leaf->getData ().normal_.dot (leaf->getData ().previous_normal_));
+      float cos_angle_normal = 1.0f -
+          (leaf->getData ().normal_.dot (leaf->getData ().previous_normal_));
       return cos_angle_normal;
     }
   }
 }
 
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 namespace pcl
 {
   //Explicit overloads for XYZRGB types
   template<> void
-  pcl::SequentialSVClustering<pcl::PointXYZRGB>::SequentialVoxelData::getPoint (pcl::PointXYZRGB &point_arg) const
+  pcl::SequentialSVClustering<pcl::PointXYZRGB>::SequentialVoxelData
+  ::getPoint (pcl::PointXYZRGB &point_arg) const
   {
-    point_arg.rgba = static_cast<uint32_t>(rgb_[0]) << 16 |
-                                                       static_cast<uint32_t>(rgb_[1]) << 8 |
-                                                                                         static_cast<uint32_t>(rgb_[2]);
+    point_arg.rgba = static_cast<uint32_t>(rgb_[0])
+        << 16 | static_cast<uint32_t>(rgb_[1])
+        << 8 | static_cast<uint32_t>(rgb_[2]);
     point_arg.x = xyz_[0];
     point_arg.y = xyz_[1];
     point_arg.z = xyz_[2];
@@ -286,11 +339,12 @@ namespace pcl
 
   //Explicit overloads for XYZRGBA types
   template<> void
-  pcl::SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData::getPoint (pcl::PointXYZRGBA &point_arg ) const
+  pcl::SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData
+  ::getPoint (pcl::PointXYZRGBA &point_arg ) const
   {
-    point_arg.rgba = static_cast<uint32_t>(rgb_[0]) << 16 |
-                                                       static_cast<uint32_t>(rgb_[1]) << 8 |
-                                                                                         static_cast<uint32_t>(rgb_[2]);
+    point_arg.rgba = static_cast<uint32_t>(rgb_[0])
+        << 16 | static_cast<uint32_t>(rgb_[1])
+        << 8 | static_cast<uint32_t>(rgb_[2]);
     point_arg.x = xyz_[0];
     point_arg.y = xyz_[1];
     point_arg.z = xyz_[2];
@@ -298,11 +352,12 @@ namespace pcl
 
   //Explicit overloads for XYZRGBL types
   template<> void
-  pcl::SequentialSVClustering<pcl::PointXYZRGBL>::SequentialVoxelData::getPoint (pcl::PointXYZRGBL &point_arg ) const
+  pcl::SequentialSVClustering<pcl::PointXYZRGBL>::SequentialVoxelData
+  ::getPoint (pcl::PointXYZRGBL &point_arg ) const
   {
-    point_arg.rgba = static_cast<uint32_t>(rgb_[0]) << 16 |
-                                                       static_cast<uint32_t>(rgb_[1]) << 8 |
-                                                                                         static_cast<uint32_t>(rgb_[2]);
+    point_arg.rgba = static_cast<uint32_t>(rgb_[0])
+        << 16 | static_cast<uint32_t>(rgb_[1])
+        << 8 | static_cast<uint32_t>(rgb_[2]);
     point_arg.x = xyz_[0];
     point_arg.y = xyz_[1];
     point_arg.z = xyz_[2];
@@ -310,11 +365,12 @@ namespace pcl
 
   //Explicit overloads for XYZRGBNormal types
   template<> void
-  pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData::getPoint (pcl::PointXYZRGBNormal &point_arg ) const
+  pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData
+  ::getPoint (pcl::PointXYZRGBNormal &point_arg ) const
   {
-    point_arg.rgba = static_cast<uint32_t>(rgb_[0]) << 16 |
-                                                       static_cast<uint32_t>(rgb_[1]) << 8 |
-                                                                                         static_cast<uint32_t>(rgb_[2]);
+    point_arg.rgba = static_cast<uint32_t>(rgb_[0])
+        << 16 | static_cast<uint32_t>(rgb_[1])
+        << 8 | static_cast<uint32_t>(rgb_[2]);
     point_arg.x = xyz_[0];
     point_arg.y = xyz_[1];
     point_arg.z = xyz_[2];
@@ -323,16 +379,19 @@ namespace pcl
     point_arg.normal[2] = normal_[2];
   }
 
-  // Explicit overload of getVoxels from SequentialSvClustering::SequentialSupervoxelHelper for XYZRGBL type
+  // Explicit overload of getVoxels for XYZRGBL type
   template <> void
-  pcl::SequentialSVClustering<pcl::PointXYZRGBL>::SequentialSupervoxelHelper::getVoxels (typename pcl::PointCloud<pcl::PointXYZRGBL>::Ptr &voxels) const
+  pcl::SequentialSVClustering<pcl::PointXYZRGBL>::SequentialSupervoxelHelper
+  ::getVoxels (typename pcl::PointCloud<pcl::PointXYZRGBL>::Ptr &voxels) const
   {
     voxels.reset (new pcl::PointCloud<pcl::PointXYZRGBL>);
     voxels->clear ();
     voxels->resize (leaves_.size ());
-    typename pcl::PointCloud<pcl::PointXYZRGBL>::iterator voxel_itr = voxels->begin ();
-    typename SequentialSupervoxelHelper::const_iterator leaf_itr;
-    for ( leaf_itr = leaves_.begin (); leaf_itr != leaves_.end (); ++leaf_itr, ++voxel_itr)
+    typename pcl::PointCloud<pcl::PointXYZRGBL>::iterator
+        voxel_itr = voxels->begin ();
+    typename SequentialSupervoxelHelper::const_iterator
+        leaf_itr = leaves_.begin ();
+    for (; leaf_itr != leaves_.end (); ++leaf_itr, ++voxel_itr)
     {
       const SequentialVoxelData& leaf_data = (*leaf_itr)->getData ();
       leaf_data.getPoint (*voxel_itr);
@@ -341,32 +400,76 @@ namespace pcl
   }
 }
 
-typedef pcl::SequentialSVClustering<pcl::PointXYZ>::SequentialVoxelData VoxelDataT;
-typedef pcl::SequentialSVClustering<pcl::PointXYZRGB>::SequentialVoxelData VoxelDataRGBT;
-typedef pcl::SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData VoxelDataRGBAT;
-//typedef pcl::SequentialSVClustering<pcl::PointXYZRGBL>::SequentialVoxelData VoxelDataRGBLT;
-//typedef pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData VoxelDataRGBNT;
+typedef pcl::SequentialSVClustering<pcl::PointXYZ>::SequentialVoxelData
+VoxelDataXYZ;
+typedef pcl::SequentialSVClustering<pcl::PointXYZRGB>::SequentialVoxelData
+VoxelDataRGB;
+typedef pcl::SequentialSVClustering<pcl::PointXYZRGBA>::SequentialVoxelData
+VoxelDataRGBA;
+//typedef
+//pcl::SequentialSVClustering<pcl::PointXYZRGBL>::SequentialVoxelData
+//VoxelDataRGBL;
+//typedef
+//pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>::SequentialVoxelData
+//VoxelDataRGBN;
 
-typedef pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZ, VoxelDataT> AdjacencyContainerT;
-typedef pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGB, VoxelDataRGBT> AdjacencyContainerRGBT;
-typedef pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBA, VoxelDataRGBAT> AdjacencyContainerRGBAT;
-//typedef pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBL, VoxelDataRGBLT> AdjacencyContainerRGBLT;
-//typedef pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBNormal, VoxelDataRGBNT> AdjacencyContainerRGBNT;
+typedef
+pcl::octree::
+OctreePointCloudSequentialContainer<pcl::PointXYZ, VoxelDataXYZ>
+AdjacencyContainerXYZ;
+typedef
+pcl::octree::
+OctreePointCloudSequentialContainer<pcl::PointXYZRGB, VoxelDataRGB>
+AdjacencyContainerRGB;
+typedef
+pcl::octree::
+OctreePointCloudSequentialContainer<pcl::PointXYZRGBA, VoxelDataRGBA>
+AdjacencyContainerRGBA;
+//typedef
+//pcl::octree::
+//OctreePointCloudSequentialContainer<pcl::PointXYZRGBL, VoxelDataRGBL>
+//AdjacencyContainerRGBL;
+//typedef
+//pcl::octree::
+//OctreePointCloudSequentialContainer<pcl::PointXYZRGBNormal, VoxelDataRGBN>
+//AdjacencyContainerRGBN;
 
 //template class pcl::SequentialSVClustering<pcl::PointXYZ>;
-template class pcl::SequentialSVClustering<pcl::PointXYZRGB>;
-template class pcl::SequentialSVClustering<pcl::PointXYZRGBA>;
+template class
+pcl::SequentialSVClustering<pcl::PointXYZRGB>;
+template class
+pcl::SequentialSVClustering<pcl::PointXYZRGBA>;
 //template class pcl::SequentialSVClustering<pcl::PointXYZRGBL>;
 //template class pcl::SequentialSVClustering<pcl::PointXYZRGBNormal>;
 
-template class pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZ, VoxelDataT>;
-template class pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGB, VoxelDataRGBT>;
-template class pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBA, VoxelDataRGBAT>;
-//template class pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBL, VoxelDataRGBLT>;
-//template class pcl::octree::OctreePointCloudSequentialContainer<pcl::PointXYZRGBNormal, VoxelDataRGBNT>;
+template class
+pcl::octree::
+OctreePointCloudSequentialContainer<pcl::PointXYZ, VoxelDataXYZ>;
+template class
+pcl::octree::
+OctreePointCloudSequentialContainer<pcl::PointXYZRGB, VoxelDataRGB>;
+template class
+pcl::octree::
+OctreePointCloudSequentialContainer<pcl::PointXYZRGBA, VoxelDataRGBA>;
+//template class
+//pcl::octree::
+//OctreePointCloudSequentialContainer<pcl::PointXYZRGBL, VoxelDataRGBL>;
+//template class
+//pcl::octree::
+//OctreePointCloudSequentialContainer<pcl::PointXYZRGBNormal, VoxelDataRGBN>;
 
-template class pcl::octree::OctreePointCloudSequential<pcl::PointXYZ, AdjacencyContainerT>;
-template class pcl::octree::OctreePointCloudSequential<pcl::PointXYZRGB, AdjacencyContainerRGBT>;
-template class pcl::octree::OctreePointCloudSequential<pcl::PointXYZRGBA, AdjacencyContainerRGBAT>;
-//template class pcl::octree::OctreePointCloudSequential<pcl::PointXYZRGBL, AdjacencyContainerRGBLT>;
-//template class pcl::octree::OctreePointCloudSequential<pcl::PointXYZRGBNormal, AdjacencyContainerRGBNT>;
+template class
+pcl::octree::
+OctreePointCloudSequential<pcl::PointXYZ, AdjacencyContainerXYZ>;
+template class
+pcl::octree::
+OctreePointCloudSequential<pcl::PointXYZRGB, AdjacencyContainerRGB>;
+template class
+pcl::octree::
+OctreePointCloudSequential<pcl::PointXYZRGBA, AdjacencyContainerRGBA>;
+//template class
+//pcl::octree::
+//OctreePointCloudSequential<pcl::PointXYZRGBL, AdjacencyContainerRGBL>;
+//template class
+//pcl::octree::
+//OctreePointCloudSequential<pcl::PointXYZRGBNormal, AdjacencyContainerRGBN>;
