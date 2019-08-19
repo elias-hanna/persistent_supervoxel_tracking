@@ -4,6 +4,9 @@ cmake_minimum_required(VERSION 3.1)
 # Project name
 project(persistent_supervoxel_tracking)
 
+#execute_process(COMMAND
+#  source ~/.bin/persistent_supervoxel_tracking_flags.bash)
+
 # Flags
 set(CMAKE_BUILD_TYPE Release)
 set(CMAKE_CXX_STANDARD 11)

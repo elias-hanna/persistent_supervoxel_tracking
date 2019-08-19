@@ -15,7 +15,7 @@
 #include "libs/libfreenect2pclgrabber/include/k2g.h"
 // Macros
 #define N_DATA 2
-#define USE_KINECT 0
+#define USE_KINECT 1
 #define KINECT_V2 0
 // Types
 typedef pcl::tracking::ParticleXYZRPY StateT;
@@ -42,6 +42,7 @@ static bool show_segmentation = false;
 static bool show_disappeared = false;
 static bool show_transforms = false;
 static bool show_unlabeled = false;
+static bool show_numbers = false;
 static uint64_t frame_count = 0;
 static pcl::GlasbeyLUT colors;
 
@@ -63,6 +64,8 @@ keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event)
   { show_disappeared = !show_disappeared; }
   if (event.getKeySym () == "KP_7" && event.keyDown ())
   { show_segmentation = !show_segmentation; }
+  if (event.getKeySym () == "KP_8" && event.keyDown ())
+  { show_numbers = !show_numbers; }
   if (event.getKeySym () == "Return" && event.keyDown ())
   { manual_mode = false; }
 }
@@ -94,9 +97,18 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer,
   {
     if (!viewer->updatePointCloud (labeled_voxel_cloud, "displayed cloud"))
     { viewer->addPointCloud (labeled_voxel_cloud, "displayed cloud"); }
-//    pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgba(colored_voxel_centroid_cloud);
-//    if (!viewer->updatePointCloud (colored_voxel_centroid_cloud, rgba, "displayed cloud"))
-//    { viewer->addPointCloud (colored_voxel_centroid_cloud, rgba, "displayed cloud"); }
+    //    pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgba(colored_voxel_centroid_cloud);
+    //    if (!viewer->updatePointCloud (colored_voxel_centroid_cloud, rgba, "displayed cloud"))
+    //    { viewer->addPointCloud (colored_voxel_centroid_cloud, rgba, "displayed cloud"); }
+    if (show_numbers)
+    {
+      for (const auto& cluster: supervoxel_clusters)
+      {
+        viewer->addText3D (std::to_string (cluster.first),
+                           cluster.second->centroid_, 0.01, 1.0, 1.0, 1.0,
+                           "text"+std::to_string (cluster.first));
+      }
+    }
   }
   // Show the observed pointcloud
   else if (!show_segmentation)
@@ -305,22 +317,24 @@ main( int argc, char** argv )
 
   //.pcd Files
   // This is where clouds is filled
-  for(int i = 0 ; i < N_DATA ; i++)
+  if (!USE_KINECT)
   {
-    PointCloudT::Ptr cloud(new PointCloudT);
-    //    std::string path = "../data/test" + std::to_string(i) + ".pcd";
-    std::string path = "../data/example_" + std::to_string(i) + ".pcd";
-    pcl::console::print_highlight (("Loading point cloud" + std::to_string(i) +
-                                    "...\n").c_str());
-    if (pcl::io::loadPCDFile<PointT> (path, *cloud))
+    for(int i = 0 ; i < N_DATA ; i++)
     {
-      pcl::console::print_error (("Error loading cloud" + std::to_string(i) +
-                                  " file!\n").c_str());
-      return (1);
+      PointCloudT::Ptr cloud(new PointCloudT);
+      //    std::string path = "../data/test" + std::to_string(i) + ".pcd";
+      std::string path = "../data/example_" + std::to_string(i) + ".pcd";
+      pcl::console::print_highlight (("Loading point cloud" + std::to_string(i) +
+                                      "...\n").c_str());
+      if (pcl::io::loadPCDFile<PointT> (path, *cloud))
+      {
+        pcl::console::print_error (("Error loading cloud" + std::to_string(i) +
+                                    " file!\n").c_str());
+        return (1);
+      }
+      clouds.push_back(cloud);
     }
-    clouds.push_back(cloud);
   }
-
   // Create a supervoxel clustering instance
   pcl::SequentialSVClustering<PointT> super (voxel_resolution, seed_resolution);
 

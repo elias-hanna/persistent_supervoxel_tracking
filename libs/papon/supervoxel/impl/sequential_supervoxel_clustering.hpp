@@ -290,7 +290,7 @@ pcl::SequentialSVClustering<PointT>::updateUnlabeledCloud ()
   pcl::StatisticalOutlierRemoval<PointT> sor (true);
   sor.setInputCloud (unlabeled_voxel_centroid_cloud_);
   sor.setMeanK (50);
-  sor.setStddevMulThresh (0.001);
+  sor.setStddevMulThresh (1.0);
   sor.filter (*unlabeled_voxel_centroid_cloud_);
   filtered_indices = sor.getRemovedIndices ();
   updateUnlabeledNormalCloud (filtered_indices);
@@ -526,10 +526,15 @@ pcl::SequentialSVClustering<PointT>::makeSupervoxels
 (SequentialSVMapT &supervoxel_clusters)
 {
   supervoxel_clusters.clear ();
+  std::vector<uint32_t> copy_of_moving_parts = moving_parts_;
   for (typename HelperListT::iterator sv_itr = supervoxel_helpers_.begin ();
        sv_itr != supervoxel_helpers_.end (); ++sv_itr)
   {
     uint32_t label = sv_itr->getLabel ();
+    copy_of_moving_parts.erase
+        (std::remove
+         (copy_of_moving_parts.begin(), copy_of_moving_parts.end(), label),
+         copy_of_moving_parts.end());
     supervoxel_clusters[label].reset
         (new SequentialSV<PointT>(sv_itr->isNew()));
     sv_itr->getXYZ (supervoxel_clusters[label]->centroid_.x,
@@ -540,6 +545,9 @@ pcl::SequentialSVClustering<PointT>::makeSupervoxels
     sv_itr->getVoxels (supervoxel_clusters[label]->voxels_);
     sv_itr->getNormals (supervoxel_clusters[label]->normals_);
   }
+  to_reset_parts_.insert (to_reset_parts_.end(),
+        std::make_move_iterator(copy_of_moving_parts.begin()),
+        std::make_move_iterator(copy_of_moving_parts.end()));
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -10,8 +10,8 @@ Getter<PointType>::Getter ():
 }
 
 template <typename PointType>
-Getter<PointType>::Getter (boost::shared_ptr<pcl::Grabber>):
-  grabber_(grabber_),
+Getter<PointType>::Getter (boost::shared_ptr<pcl::Grabber> grabber):
+  grabber_(grabber),
   started_(true)
 {
   boost::function<void (const ConstPtr&)> callback = boost::bind(&Getter::cloud_callback, this, _1);
@@ -34,8 +34,9 @@ Getter<PointType>::~Getter ()
 }
 
 template <typename PointType> pcl::PointCloud<PointType>
-Getter<PointType>::setGrabber (boost::shared_ptr<pcl::Grabber>)
+Getter<PointType>::setGrabber (boost::shared_ptr<pcl::Grabber> grabber)
 {
+  grabber_ = grabber;
   boost::function<void (const ConstPtr&)> callback = boost::bind(&Getter::cloud_callback, this, _1);
   connection_ = grabber_->registerCallback(callback);
   grabber_->start();
