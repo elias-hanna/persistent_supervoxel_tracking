@@ -286,13 +286,22 @@ pcl::SequentialSVClustering<PointT>::updateUnlabeledCloud ()
 {
   IndicesConstPtr filtered_indices (new std::vector<int>);
   // Filter noise from unlabeled voxel centroid cloud
-  typename PointCloudT::Ptr tmp_cloud(new PointCloudT);
-  pcl::StatisticalOutlierRemoval<PointT> sor (true);
-  sor.setInputCloud (unlabeled_voxel_centroid_cloud_);
-  sor.setMeanK (50);
-  sor.setStddevMulThresh (1.0);
-  sor.filter (*unlabeled_voxel_centroid_cloud_);
-  filtered_indices = sor.getRemovedIndices ();
+//  pcl::StatisticalOutlierRemoval<PointT> sor (true);
+//  sor.setInputCloud (unlabeled_voxel_centroid_cloud_);
+//  sor.setMeanK (50);
+//  sor.setStddevMulThresh (0.001);
+//  sor.filter (*unlabeled_voxel_centroid_cloud_);
+//  filtered_indices = sor.getRemovedIndices ();
+
+  pcl::RadiusOutlierRemoval<PointT> rorfilter (true); // Initializing with true will allow us to extract the removed indices
+  rorfilter.setInputCloud (unlabeled_voxel_centroid_cloud_);
+  rorfilter.setRadiusSearch (2*resolution_);
+  rorfilter.setMinNeighborsInRadius (10);
+//  rorfilter.setNegative (true);
+  rorfilter.filter (*unlabeled_voxel_centroid_cloud_);
+  // The resulting cloud_out contains all points of cloud_in that have 4 or less neighbors within the 0.1 search radius
+  filtered_indices = rorfilter.getRemovedIndices ();
+  // The indices_rem array indexes all points of cloud_in that have 5 or more neighbors within the 0.1 search radius
   updateUnlabeledNormalCloud (filtered_indices);
 }
 
@@ -460,7 +469,7 @@ pcl::SequentialSVClustering<PointT>::computeUnlabeledVoxelCentroidCloud ()
   typename LeafVectorT::iterator leaf_itr = sequential_octree_->begin ();
   typename PointCloudT::iterator un_cent_cloud_itr =
       unlabeled_voxel_centroid_cloud_->begin ();
-  for (int idx = 0 ; leaf_itr != sequential_octree_->end (); ++leaf_itr, ++idx)
+  for (; leaf_itr != sequential_octree_->end (); ++leaf_itr)
   {
     SequentialVoxelData& new_voxel_data = (*leaf_itr)->getData ();
     if(new_voxel_data.label_ == -1)

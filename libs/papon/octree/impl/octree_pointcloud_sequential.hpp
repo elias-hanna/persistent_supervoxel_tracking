@@ -227,7 +227,7 @@ OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>
         leaf_container->getData ().setChanged (false);
       }
     }
-    
+
   }
   //Swap new leaf_key vector (which now contains old and new combined) for old (which is not needed anymore)
   leaf_vector_.swap (new_leaves_);
@@ -256,7 +256,6 @@ OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT>
   //Final check to make sure they match the leaf_key_vector is correct size after deletion
   assert (leaf_vector_.size () == this->getLeafCount ());
   assert (key_vector_.size () == leaf_vector_.size ());
-
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -267,8 +266,11 @@ pcl::octree::OctreePointCloudSequential<PointT, LeafContainerT, BranchContainerT
   {
     LeafContainerT *leaf_container = leaf_vector_[i];
     boost::shared_ptr<OctreeKey> key = key_vector_[i];
-    if (leaf_container->getPointCounter () != 0) //Existed in previous frame and observed so just update data
+    //Existed in previous frame, check if it has changed
+    if (leaf_container->getPointCounter () != 0
+        && !(leaf_container->getData ().isNew ()))
     {
+      float val =  diff_func_ (leaf_container);
       if (diff_func_ && diff_func_ (leaf_container) >= difference_threshold_)
       {
         leaf_container->getData ().setChanged (true);

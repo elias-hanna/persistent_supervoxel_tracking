@@ -16,7 +16,7 @@
 // Macros
 #define N_DATA 2
 #define USE_KINECT 1
-#define KINECT_V2 0
+#define KINECT_V2 1
 // Types
 typedef pcl::tracking::ParticleXYZRPY StateT;
 typedef pcl::PointXYZRGBA PointT;
@@ -389,7 +389,7 @@ main( int argc, char** argv )
     //    viewer->addSphere(pt1, 0.005, 0, 255, 0, "start_test ");
     //    viewer->addSphere(pt2, 0.005, 255, 0, 0, "end_test ");
     float minX = -0.35; float minY = -0.25; float minZ = 0.8;
-    float maxX = 0.35; float maxY = 0.5; float maxZ = 1.4;
+    float maxX = 0.35; float maxY = 0.5; float maxZ = 1.3;
     pcl::CropBox<PointT> boxFilter;
     boxFilter.setMin(Eigen::Vector4f(minX, minY, minZ, 1.0));
     boxFilter.setMax(Eigen::Vector4f(maxX, maxY, maxZ, 1.0));

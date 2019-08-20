@@ -57,6 +57,7 @@
 #include <pcl/features/fpfh_omp.h>
 #include <pcl/filters/voxel_grid_occlusion_estimation.h>
 #include <boost/thread/mutex.hpp>
+#include <pcl/filters/radius_outlier_removal.h>
 
 namespace pcl
 {
