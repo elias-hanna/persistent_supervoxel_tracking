@@ -61,6 +61,18 @@
 
 namespace pcl
 {
+  struct FPFHCIELabSignature36
+  {
+      float histogram[36];
+      static int descriptorSize () { return 36; }
+  };
+}
+POINT_CLOUD_REGISTER_POINT_STRUCT (pcl::FPFHCIELabSignature36,
+                                   (float[36], histogram, histogram)
+);
+
+namespace pcl
+{
   /** \brief Supervoxel container class - stores a cluster extracted using
    * supervoxel clustering
    */
@@ -251,7 +263,8 @@ namespace pcl
       typedef pcl::PointCloud<pcl::PointXYZI> PointCloudI;
 
       // Feature space search types
-      typedef pcl::FPFHSignature33 FeatureT;
+//      typedef pcl::FPFHSignature33 FeatureT;
+      typedef pcl::FPFHCIELabSignature36 FeatureT;
       typedef flann::L1<float> DistanceT; // Manhattan distance
       //typedef flann::L2<float> DistanceT;
       //typedef flann::KL_Divergence<float> DistanceT;
@@ -476,6 +489,13 @@ namespace pcl
                               const typename PointCloudT::Ptr cloud,
                               const NormalCloud::Ptr normals) const;
 
+
+      std::pair
+      <pcl::IndicesPtr,pcl::PointCloud<pcl::FPFHCIELabSignature36>::Ptr>
+      computeFPFHCIELabDescriptors
+      (const PointCloudScale sift_result, const typename PointCloudT::Ptr cloud,
+       const NormalCloud::Ptr normals) const;
+
       /** \brief This method filters out the keypoints where the descriptor
        * don't hold enough information
        *  \note Should the descriptor always hold good information ? Don't
@@ -577,6 +597,33 @@ namespace pcl
        * voxel cloud */
       bool
       computeUniformKeypointsAndFPFHDescriptors
+      (KeypointFeatureT &current_keypoints,
+       int min_nb_of_keypoints);
+
+      /** \brief This method computes the keypoints and the descriptors of the
+       * input point cloud and stores them
+       * \note This overload compute keypoints and descriptors from the
+       * previous supervoxel clusters and stores it as a map linking the
+       * supervoxel label to a pair of indices (the keypoints in previous voxel
+       *  cloud) and the corresponding descriptor cloud (FeatureT points)
+       * \param[out] returns true if keypoints have been found in at least one
+       * of the previous voxel clouds corresponding to a supervoxel */
+      bool
+      computeUniformKeypointsAndFPFHCIELabDescriptors
+      (SequentialSVMapT &supervoxel_clusters,
+       KeypointMapFeatureT &previous_keypoints,
+       int min_nb_of_keypoints);
+
+      /** \brief This method computes the keypoints and the descriptors of the
+       * input point cloud and stores them
+       * \note This overload compute keypoints and descriptors from the current
+       *  unlabeled voxel cloud and stores it as a pair of indices
+       * (the keypoints in previous voxel cloud) and the corresponding
+       * descriptor cloud (FeatureT points)
+       * \param[out] returns true if keypoints have been found in the current
+       * voxel cloud */
+      bool
+      computeUniformKeypointsAndFPFHCIELabDescriptors
       (KeypointFeatureT &current_keypoints,
        int min_nb_of_keypoints);
 

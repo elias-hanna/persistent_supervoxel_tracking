@@ -30,10 +30,6 @@ typedef pcl::PointCloud<PointLT> PointLCloudT;
 typedef pcl::PointXYZRGBL PointRGBLT;
 typedef pcl::PointCloud<PointRGBLT> PointRGBLCloudT;
 
-POINT_CLOUD_REGISTER_POINT_STRUCT (Histogram<32>,
-                                   (float[32], histogram, histogram)
-)
-
 static bool manual_mode = false;
 static bool show_prev = false;
 static bool show_curr = false;

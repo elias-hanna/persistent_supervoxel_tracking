@@ -671,6 +671,143 @@ pcl::SequentialSVClustering<PointT>::computeFPFHDescriptors
       (indices, fpfhs);
 }
 
+void rgb2Lab
+(int r, int g, int b, float& L, float& a, float& b2)
+{
+    std::function<float(float)> f = [](float t) -> float {
+        if(t > 0.008856f)
+            return std::pow(t,0.3333f);
+        else return 7.787f*t + 0.138f;
+    };
+
+    float X = static_cast<float>(r) * 0.412453f +
+        static_cast<float>(g) * 0.357580f + static_cast<float>(b) * 0.180423f;
+    float Y = static_cast<float>(r) * 0.212671f +
+        static_cast<float>(g) * 0.715160f + static_cast<float>(b) * 0.072169f;
+    float Z = static_cast<float>(r) * 0.019334f +
+        static_cast<float>(g) * 0.119193f + static_cast<float>(b) * 0.950227f;
+
+    float Xn = 95.047f, Yn = 100.0f, Zn = 108.883f;
+
+    L = 116*f(Y/Yn) - 16;
+    if(L>100.0f)
+        L = 100.0f;
+    a = 500*(f(X/Xn) - f(Y/Yn));
+    if(a > 300.0f)
+        a = 300.0f;
+    else if ( a < -300.0f)
+        a = -300.0f;
+    b2 = 200*(f(Y/Yn) - f(Z/Zn));
+    if(b2 > 300.0f)
+        b2 = 300.0f;
+    else if(b < -300.0f)
+        b2 = -300.0f;
+
+    L = L / 100.0f;
+    a = a/300.0f;
+    b2 = b2/300.0f;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+template <typename PointT>
+std::pair<pcl::IndicesPtr, pcl::PointCloud<pcl::FPFHCIELabSignature36>::Ptr >
+pcl::SequentialSVClustering<PointT>::computeFPFHCIELabDescriptors
+(const PointCloudScale sift_result, const typename PointCloudT::Ptr cloud,
+ const NormalCloud::Ptr normals) const
+{
+  // Output datasets
+  pcl::PointCloud<pcl::FPFHSignature33>::Ptr fpfhs
+      (new pcl::PointCloud<pcl::FPFHSignature33> ());
+  pcl::PointCloud<pcl::Histogram<3>>::Ptr cielab
+      (new pcl::PointCloud<pcl::Histogram<3>>);
+  pcl::PointCloud<pcl::FPFHCIELabSignature36>::Ptr fpfh_cielab
+      (new pcl::PointCloud<pcl::FPFHCIELabSignature36> ());
+  IndicesPtr indices (new std::vector<int>);
+  // We only search the indice of each keypoint in the main PointCloud
+  // so we are just interested in their XYZ position
+  pcl::search::KdTree<pcl::PointXYZ> point_indices_kdtree
+      (new pcl::search::KdTree<pcl::PointXYZ>);
+  pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cloud
+      (new pcl::PointCloud<pcl::PointXYZ>);
+
+  copyPointCloud(*cloud, *xyz_cloud);
+  point_indices_kdtree.setInputCloud (xyz_cloud);
+
+  typename pcl::search::KdTree<pcl::PointXYZ>::Ptr voxel_cloud_search;
+  voxel_cloud_search.reset (new pcl::search::KdTree<pcl::PointXYZ>);
+  voxel_cloud_search->setInputCloud (xyz_cloud);
+
+  for(auto point_scale: sift_result)
+  {
+    std::vector<int> n_indices;
+    std::vector<float> sqr_distances;
+
+    pcl::PointXYZ pt(point_scale.x, point_scale.y, point_scale.z);
+    point_indices_kdtree.nearestKSearch (pt, 1, n_indices, sqr_distances);
+    int keypoint_indice = n_indices[0];
+    indices->push_back(keypoint_indice);
+
+    // Search the neighbours in radius of the point
+    voxel_cloud_search->radiusSearch
+        (pt, seed_resolution_/2., n_indices, sqr_distances);
+
+    pcl::Histogram<3> mean_lab;
+    mean_lab.histogram[0] = 0.f;
+    mean_lab.histogram[1] = 0.f;
+    mean_lab.histogram[2] = 0.f;
+    for (const auto& ind: n_indices)
+    {
+      PointT n_pt = cloud->at (ind);
+      float L, a, b;
+      rgb2Lab (n_pt.r, n_pt.g, n_pt.b, L, a, b);
+      mean_lab.histogram[0] += L;
+      mean_lab.histogram[1] += a;
+      mean_lab.histogram[2] += b;
+    }
+    cielab->push_back (mean_lab);
+  }
+
+  // Create the FPFH estimation class, and pass the input dataset+normals to it
+  pcl::FPFHEstimation<PointT, pcl::Normal, pcl::FPFHSignature33> fpfh;
+  fpfh.setInputCloud (cloud);
+  fpfh.setInputNormals (normals);
+  fpfh.setIndices (indices);
+
+  // Create an empty kdtree representation, and pass it to the FPFH estimation
+  // object.
+  // Its content will be filled inside the object, based on the given input
+  // dataset (as no other search surface is given).
+  typename pcl::search::KdTree<PointT>::Ptr tree
+      (new pcl::search::KdTree<PointT>);
+
+  fpfh.setSearchMethod (tree);
+
+  // Use all neighbors in a sphere of radius 5cm
+  // IMPORTANT: the radius used here has to be larger than the radius used
+  // to estimate the surface normals!!!
+  fpfh.setRadiusSearch (seed_resolution_/2.);
+
+  // Compute the features
+  fpfh.compute (*fpfhs);
+
+  for (size_t ind = 0; ind < fpfhs->size (); ++ind)
+  {
+    pcl::FPFHCIELabSignature36 hist36;
+    for (size_t i = 0; i < 36; ++i)
+    {
+      if (i < 33)
+      { hist36.histogram[i] = fpfhs->at (ind).histogram[i]; }
+      else
+      { hist36.histogram[i] = cielab->at (ind).histogram[i - 33]; }
+    }
+    fpfh_cielab->push_back (hist36);
+  }
+//  std::cout << "fpfhcielab size: " << fpfh_cielab->size () << "\n";
+  return std::pair<IndicesPtr, pcl::PointCloud<pcl::FPFHCIELabSignature36>::Ptr>
+      (indices, fpfh_cielab);
+}
+
+
 ///////////////////////////////////////////////////////////////////////////////
 template <typename PointT> pcl::PointIndicesPtr
 pcl::SequentialSVClustering<PointT>::filterKeypoints
@@ -735,9 +872,104 @@ pcl::SequentialSVClustering<PointT>::getLabelsOfDynamicSV
   return (labels_to_track);
 }
 
+/////////////////////////////////////////////////////////////////////////////////
+//template <typename PointT> bool
+//pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
+//(SequentialSVMapT &supervoxel_clusters,
+// KeypointMapFeatureT &previous_keypoints,
+// int min_nb_of_keypoints)
+//{
+//  bool points_found = false;
+//  prev_keypoints_location_.clear ();
+//  // Get the labels that need to be tracked
+//  std::vector<uint32_t> labels_to_track =
+//      getLabelsOfDynamicSV (supervoxel_clusters);
+//  for (const auto& label: labels_to_track)
+//  { std::cout << "to track: " << label << "\n"; }
+
+//  for (const auto& label: labels_to_track)
+//  {
+//    PointCloudScale::Ptr keypoints (new PointCloudScale);
+
+//    pcl::octree::OctreePointCloudSearch <PointT> seed_octree (2 * resolution_);
+//    seed_octree.setInputCloud (supervoxel_clusters[label]->voxels_);
+//    seed_octree.addPointsFromInputCloud ();
+//    std::vector<PointT, Eigen::aligned_allocator<PointT> > voxel_centers;
+//    int num_seeds = seed_octree.getOccupiedVoxelCenters(voxel_centers);
+//    typename PointCloudT::Ptr tmp (new PointCloudT);
+//    for (const auto& point: voxel_centers)
+//    { tmp->push_back (point); }
+
+//    copyPointCloud (*tmp, *keypoints);
+//    if(keypoints->size () > min_nb_of_keypoints)
+//    {
+//      // Compute the FPFH descriptors
+//      KeypointFeatureT fpfh_output = computeFPFHDescriptors
+//          (*keypoints, prev_voxel_centroid_cloud_,
+//           prev_voxel_centroid_normal_cloud_);
+//      KeypointFeatureT filtered_fpfh_output
+//          (boost::make_shared<std::vector<int>> (),
+//           boost::make_shared<PointCloudFeatureT> ());
+//      pcl::PointIndicesPtr filtered_point_indices =
+//          filterKeypoints(fpfh_output, filtered_fpfh_output);
+//      // Min number of keypoints in order to track the supervoxel
+//      if(filtered_fpfh_output.second->size () > min_nb_of_keypoints)
+//      {
+//        previous_keypoints.insert (std::pair<uint32_t, KeypointFeatureT>
+//                                   (label, filtered_fpfh_output));
+//        points_found = true;
+//      }
+//      else
+//      { to_reset_parts_.push_back (label); }
+//    }
+//    else
+//    { to_reset_parts_.push_back (label); }
+//  }
+//  return points_found;
+//}
+
+
+/////////////////////////////////////////////////////////////////////////////////
+//template <typename PointT> bool
+//pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
+//(KeypointFeatureT &current_keypoints,
+// int min_nb_of_keypoints)
+//{
+//  // Initiliaze the SIFT keypoints structure
+//  PointCloudScale::Ptr keypoints (new PointCloudScale);
+//  pcl::octree::OctreePointCloudSearch <PointT> seed_octree (2 * resolution_);
+//  seed_octree.setInputCloud (unlabeled_voxel_centroid_cloud_);
+//  seed_octree.addPointsFromInputCloud ();
+//  std::vector<PointT, Eigen::aligned_allocator<PointT> > voxel_centers;
+//  int num_seeds = seed_octree.getOccupiedVoxelCenters(voxel_centers);
+//  typename PointCloudT::Ptr tmp (new PointCloudT);
+//  for (const auto& point: voxel_centers)
+//  { tmp->push_back (point); }
+//  copyPointCloud (*tmp, *keypoints);
+//  if(keypoints->size () > min_nb_of_keypoints)
+//  {
+//    // Compute the FPFH descriptors
+//    KeypointFeatureT fpfh_output = computeFPFHDescriptors
+//        (*keypoints, voxel_centroid_cloud_, getVoxelNormalCloud ());
+//    KeypointFeatureT filtered_fpfh_output
+//        (boost::make_shared<std::vector<int>> (),
+//         boost::make_shared<PointCloudFeatureT> ());
+//    pcl::PointIndicesPtr filtered_point_indices =
+//        filterKeypoints(fpfh_output, filtered_fpfh_output);
+//    // Min number of keypoints in order to track the supervoxel
+//    if(filtered_fpfh_output.second->size () > min_nb_of_keypoints)
+//    {
+//      current_keypoints = filtered_fpfh_output;
+//      return true;
+//    }
+//  }
+//  return false;
+//}
+
 ///////////////////////////////////////////////////////////////////////////////
 template <typename PointT> bool
-pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
+pcl::SequentialSVClustering<PointT>::
+computeUniformKeypointsAndFPFHCIELabDescriptors
 (SequentialSVMapT &supervoxel_clusters,
  KeypointMapFeatureT &previous_keypoints,
  int min_nb_of_keypoints)
@@ -766,8 +998,8 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
     copyPointCloud (*tmp, *keypoints);
     if(keypoints->size () > min_nb_of_keypoints)
     {
-      // Compute the RIFT descriptors
-      KeypointFeatureT fpfh_output = computeFPFHDescriptors
+      // Compute the FPFH descriptors
+      KeypointFeatureT fpfh_output = computeFPFHCIELabDescriptors
           (*keypoints, prev_voxel_centroid_cloud_,
            prev_voxel_centroid_normal_cloud_);
       KeypointFeatureT filtered_fpfh_output
@@ -794,7 +1026,8 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
 
 ///////////////////////////////////////////////////////////////////////////////
 template <typename PointT> bool
-pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
+pcl::SequentialSVClustering<PointT>::
+computeUniformKeypointsAndFPFHCIELabDescriptors
 (KeypointFeatureT &current_keypoints,
  int min_nb_of_keypoints)
 {
@@ -811,8 +1044,8 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
   copyPointCloud (*tmp, *keypoints);
   if(keypoints->size () > min_nb_of_keypoints)
   {
-    // Compute the RIFT descriptors
-    KeypointFeatureT fpfh_output = computeFPFHDescriptors
+    // Compute the FPFH descriptors
+    KeypointFeatureT fpfh_output = computeFPFHCIELabDescriptors
         (*keypoints, voxel_centroid_cloud_, getVoxelNormalCloud ());
     KeypointFeatureT filtered_fpfh_output
         (boost::make_shared<std::vector<int>> (),
@@ -935,7 +1168,7 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC
   // previous_keypoints is a map where the key is the label of the concerned
   // supervoxel, and the value is a pair consisting as first element of the
   // Indices of the keypoints in the previous voxel centroid cloud and as
-  // second element of the RIFT descriptor matching this indice.
+  // second element of the FPFH descriptor matching this indice.
   KeypointMapFeatureT previous_keypoints;
   KeypointFeatureT current_keypoints;
   // Parameters for sift computation
@@ -950,16 +1183,18 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC
   if(getMaxLabel() > 0)
   {
     // Compute keypoints and descriptors for previous cloud
-    computeUniformKeypointsAndFPFHDescriptors (supervoxel_clusters,
-                                               previous_keypoints,
-                                               min_number_of_inliers);
-    if (computeUniformKeypointsAndFPFHDescriptors (supervoxel_clusters,
+//    if (computeUniformKeypointsAndFPFHDescriptors (supervoxel_clusters,
+//                                                   previous_keypoints,
+//                                                   min_number_of_inliers))
+    if (computeUniformKeypointsAndFPFHCIELabDescriptors (supervoxel_clusters,
                                                    previous_keypoints,
                                                    min_number_of_inliers))
     {
 
       // Compute keypoints and descriptors for current cloud
-      if (!computeUniformKeypointsAndFPFHDescriptors (current_keypoints,
+//      if (!computeUniformKeypointsAndFPFHDescriptors (current_keypoints,
+//                                                 min_number_of_inliers))
+      if (!computeUniformKeypointsAndFPFHCIELabDescriptors (current_keypoints,
                                                  min_number_of_inliers))
       { return (found_transforms); }
       // For visualization

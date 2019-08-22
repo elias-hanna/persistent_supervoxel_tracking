@@ -41,19 +41,6 @@
 #include <pcl/search/impl/search.hpp>
 #include <pcl/point_representation.h>
 #include <pcl/kdtree/impl/kdtree_flann.hpp>
-
-POINT_CLOUD_REGISTER_POINT_STRUCT (Histogram<32>,
-                                   (float[32], histogram, histogram)
-)
-
-// Instantiations of specific point types
-template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::L2<float>>;
-template class pcl::search::FlannSearch<pcl::Histogram<32>, flann::L1<float>>;
-template class pcl::search::FlannSearch
-<pcl::Histogram<32>, flann::KL_Divergence<float>>;
-template class pcl::search::FlannSearch
-<pcl::Histogram<32>, flann::HistIntersectionDistance<float>>;
-
 #include <pcl/point_types.h>
 #include <pcl/impl/instantiate.hpp>
 #include "../impl/sequential_supervoxel_clustering.hpp"
