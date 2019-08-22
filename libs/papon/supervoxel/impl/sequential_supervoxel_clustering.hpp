@@ -286,18 +286,18 @@ pcl::SequentialSVClustering<PointT>::updateUnlabeledCloud ()
 {
   IndicesConstPtr filtered_indices (new std::vector<int>);
   // Filter noise from unlabeled voxel centroid cloud
-//  pcl::StatisticalOutlierRemoval<PointT> sor (true);
-//  sor.setInputCloud (unlabeled_voxel_centroid_cloud_);
-//  sor.setMeanK (50);
-//  sor.setStddevMulThresh (0.001);
-//  sor.filter (*unlabeled_voxel_centroid_cloud_);
-//  filtered_indices = sor.getRemovedIndices ();
+  //  pcl::StatisticalOutlierRemoval<PointT> sor (true);
+  //  sor.setInputCloud (unlabeled_voxel_centroid_cloud_);
+  //  sor.setMeanK (50);
+  //  sor.setStddevMulThresh (0.001);
+  //  sor.filter (*unlabeled_voxel_centroid_cloud_);
+  //  filtered_indices = sor.getRemovedIndices ();
 
   pcl::RadiusOutlierRemoval<PointT> rorfilter (true); // Initializing with true will allow us to extract the removed indices
   rorfilter.setInputCloud (unlabeled_voxel_centroid_cloud_);
   rorfilter.setRadiusSearch (2*resolution_);
   rorfilter.setMinNeighborsInRadius (10);
-//  rorfilter.setNegative (true);
+  //  rorfilter.setNegative (true);
   rorfilter.filter (*unlabeled_voxel_centroid_cloud_);
   // The resulting cloud_out contains all points of cloud_in that have 4 or less neighbors within the 0.1 search radius
   filtered_indices = rorfilter.getRemovedIndices ();
@@ -555,8 +555,8 @@ pcl::SequentialSVClustering<PointT>::makeSupervoxels
     sv_itr->getNormals (supervoxel_clusters[label]->normals_);
   }
   to_reset_parts_.insert (to_reset_parts_.end(),
-        std::make_move_iterator(copy_of_moving_parts.begin()),
-        std::make_move_iterator(copy_of_moving_parts.end()));
+                          std::make_move_iterator(copy_of_moving_parts.begin()),
+                          std::make_move_iterator(copy_of_moving_parts.end()));
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -736,12 +736,13 @@ pcl::SequentialSVClustering<PointT>::getLabelsOfDynamicSV
 }
 
 ///////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
+template <typename PointT> bool
 pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
 (SequentialSVMapT &supervoxel_clusters,
  KeypointMapFeatureT &previous_keypoints,
  int min_nb_of_keypoints)
 {
+  bool points_found = false;
   prev_keypoints_location_.clear ();
   // Get the labels that need to be tracked
   std::vector<uint32_t> labels_to_track =
@@ -779,6 +780,7 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
       {
         previous_keypoints.insert (std::pair<uint32_t, KeypointFeatureT>
                                    (label, filtered_fpfh_output));
+        points_found = true;
       }
       else
       { to_reset_parts_.push_back (label); }
@@ -786,11 +788,12 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
     else
     { to_reset_parts_.push_back (label); }
   }
+  return points_found;
 }
 
 
 ///////////////////////////////////////////////////////////////////////////////
-template <typename PointT> void
+template <typename PointT> bool
 pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
 (KeypointFeatureT &current_keypoints,
  int min_nb_of_keypoints)
@@ -820,8 +823,10 @@ pcl::SequentialSVClustering<PointT>::computeUniformKeypointsAndFPFHDescriptors
     if(filtered_fpfh_output.second->size () > min_nb_of_keypoints)
     {
       current_keypoints = filtered_fpfh_output;
+      return true;
     }
   }
+  return false;
 }
 
 /*
@@ -942,20 +947,20 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC
   int num_max_iter = 100; // Same as in Van Hoof paper
   float threshold = 100.f;
   std::vector<uint32_t> labels;
-
   if(getMaxLabel() > 0)
   {
     // Compute keypoints and descriptors for previous cloud
     computeUniformKeypointsAndFPFHDescriptors (supervoxel_clusters,
                                                previous_keypoints,
                                                min_number_of_inliers);
-    if(previous_keypoints.size () > 0)
+    if (computeUniformKeypointsAndFPFHDescriptors (supervoxel_clusters,
+                                                   previous_keypoints,
+                                                   min_number_of_inliers))
     {
+
       // Compute keypoints and descriptors for current cloud
-      computeUniformKeypointsAndFPFHDescriptors (current_keypoints,
-                                                 min_number_of_inliers);
-      // If there is not enough keypoints in current scene
-      if (current_keypoints.first->size () < min_number_of_inliers)
+      if (!computeUniformKeypointsAndFPFHDescriptors (current_keypoints,
+                                                 min_number_of_inliers))
       { return (found_transforms); }
       // For visualization
       current_keypoints_indices_ = *(current_keypoints.first);

@@ -558,8 +558,10 @@ namespace pcl
        * \note This overload compute keypoints and descriptors from the
        * previous supervoxel clusters and stores it as a map linking the
        * supervoxel label to a pair of indices (the keypoints in previous voxel
-       *  cloud) and the corresponding descriptor cloud (FeatureT points) */
-      void
+       *  cloud) and the corresponding descriptor cloud (FeatureT points)
+       * \param[out] returns true if keypoints have been found in at least one
+       * of the previous voxel clouds corresponding to a supervoxel */
+      bool
       computeUniformKeypointsAndFPFHDescriptors
       (SequentialSVMapT &supervoxel_clusters,
        KeypointMapFeatureT &previous_keypoints,
@@ -570,8 +572,10 @@ namespace pcl
        * \note This overload compute keypoints and descriptors from the current
        *  unlabeled voxel cloud and stores it as a pair of indices
        * (the keypoints in previous voxel cloud) and the corresponding
-       * descriptor cloud (FeatureT points) */
-      void
+       * descriptor cloud (FeatureT points)
+       * \param[out] returns true if keypoints have been found in the current
+       * voxel cloud */
+      bool
       computeUniformKeypointsAndFPFHDescriptors
       (KeypointFeatureT &current_keypoints,
        int min_nb_of_keypoints);
