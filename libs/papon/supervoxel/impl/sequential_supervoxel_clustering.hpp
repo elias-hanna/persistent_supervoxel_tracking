@@ -63,6 +63,7 @@ pcl::SequentialSVClustering<PointT>::SequentialSVClustering
   ignore_input_normals_ (false),
   prune_close_seeds_ (prune_close_seeds),
   label_colors_ (0),
+  frame_number_ (0),
   use_single_camera_transform_ (use_single_camera_transform),
   use_default_transform_behaviour_ (true),
   nb_of_unlabeled_voxels_ (0)
@@ -240,6 +241,7 @@ pcl::SequentialSVClustering<PointT>::prepareForSegmentation ()
 
   // Update previous clouds
   updatePrevClouds ();
+  frame_number_++;
   // Add the new cloud of data to the octree
   sequential_octree_->addPointsFromInputCloud ();
   // Compute normals and insert data for centroids into data field of octree
@@ -852,7 +854,8 @@ pcl::SequentialSVClustering<PointT>::getLabelsOfDynamicSV
       leaf_itr != sequential_octree_->end (); ++leaf_itr)
   {
     SequentialVoxelData& voxel = (*leaf_itr)->getData ();
-    if(voxel.frame_occluded_ != 0) // It is currently occluded
+    // ATTENTION
+    if(/*voxel.frame_occluded_ != 0 &&*/ voxel.frame_occluded_ == frame_number_) // It is currently occluded
     { ++nb_occluded_voxels_by_labels[voxel.label_ - 1]; }
     ++nb_voxels_by_labels[voxel.label_ - 1];
   }
@@ -1754,7 +1757,7 @@ pcl::SequentialSVClustering<PointT>::RANSACRegistration::operator()
     // Condition: there is more than a quarter of possible matches
     // with a minimum of 6 (like in Van Hoof's paper)
     if(maybe_inliers.size () >= pair_.second.second->size ()/4
-       && maybe_inliers.size () > 6)
+       && maybe_inliers.size () >= 6)
     {
       // Compute keypoints matches with maybe inliers
       std::vector<int> matches_of_maybe_inliers =
@@ -1782,10 +1785,9 @@ pcl::SequentialSVClustering<PointT>::RANSACRegistration::operator()
         float coeff_in = 1.f; float coeff_err = 3.f;
         float in_score = inliers.size()/pair_.second.second->size ();
         float err_score = (threshold_ - err)/threshold_;
-        float curr_score = coeff_in * in_score
-            + ((coeff_err * err_score > 0)?coeff_err * err_score:0);
-        if (curr_score > best_score_
-            && inliers.size () >= maybe_inliers.size ())
+        float curr_score = coeff_in * in_score + coeff_err * err_score;
+//            + ((coeff_err * err_score > 0)?coeff_err * err_score:0);
+        if (curr_score > best_score_)
         {
           best_fit_ = transformation_est;
           best_score_ = curr_score;

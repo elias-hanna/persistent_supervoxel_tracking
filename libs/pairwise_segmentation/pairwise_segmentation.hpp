@@ -147,7 +147,7 @@ void
 PairwiseSegmentation::regroupObjects ()
 {
   Segmentation::iterator seg_it = current_segmentation_.begin();
-  int it = 0;int it2 = 0;
+  int it = 0; int it2 = 0;
   while (seg_it != current_segmentation_.end ())
   {
     std::pair<uint32_t, std::vector<uint32_t>> pair = (*seg_it);

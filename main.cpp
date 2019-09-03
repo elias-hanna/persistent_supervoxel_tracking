@@ -7,16 +7,24 @@
 #include <pcl/filters/crop_box.h>
 // Local libs includes
 #include "libs/papon/supervoxel/sequential_supervoxel_clustering.h"
-#include "libs/getter/getter.hpp"
 #include "libs/supervoxel_tracker/supervoxel_tracker.h"
 #include "libs/pairwise_segmentation/pairwise_segmentation.h"
+
+#define USE_KINECT 1
+#define KINECT_V2 1
+
+#if USE_KINECT == 1
+#if KINECT_V2 == 1
 // Kinect2 includes
 #define WITH_PCL
 #include "libs/libfreenect2pclgrabber/include/k2g.h"
+#else
+#include "libs/getter/getter.hpp"
+#endif
+#endif
 // Macros
 #define N_DATA 2
-#define USE_KINECT 1
-#define KINECT_V2 1
+
 // Types
 typedef pcl::tracking::ParticleXYZRPY StateT;
 typedef pcl::PointXYZRGBA PointT;
@@ -42,6 +50,14 @@ static bool show_numbers = false;
 static uint64_t frame_count = 0;
 static pcl::GlasbeyLUT colors;
 
+template <typename T>
+std::ostream& operator<<(std::ostream& os, const std::vector<T> &input)
+{
+  for (const auto& i: input)
+    os << i << ";";
+  return os;
+}
+
 void
 keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event)
 {
@@ -64,6 +80,8 @@ keyboardEventOccurred(const pcl::visualization::KeyboardEvent &event)
   { show_numbers = !show_numbers; }
   if (event.getKeySym () == "Return" && event.keyDown ())
   { manual_mode = false; }
+  if (event.getKeySym () == "Escape" && event.keyDown ())
+  { exit(0); }
 }
 
 void
@@ -93,9 +111,6 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer,
   {
     if (!viewer->updatePointCloud (labeled_voxel_cloud, "displayed cloud"))
     { viewer->addPointCloud (labeled_voxel_cloud, "displayed cloud"); }
-    //    pcl::visualization::PointCloudColorHandlerRGBField<PointT> rgba(colored_voxel_centroid_cloud);
-    //    if (!viewer->updatePointCloud (colored_voxel_centroid_cloud, rgba, "displayed cloud"))
-    //    { viewer->addPointCloud (colored_voxel_centroid_cloud, rgba, "displayed cloud"); }
     if (show_numbers)
     {
       for (const auto& cluster: supervoxel_clusters)
@@ -143,24 +158,37 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer,
       viewer->addPointCloud<PointT>
           (un_voxel_centroid_cloud, rgb, "unlabeled cloud");
     }
-    //    viewer->setPointCloudRenderingProperties (pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10, "unlabeled cloud");
+    //    viewer->setPointCloudRenderingProperties
+    //(pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 10, "unlabeled cloud");
   }
   if (!show_segmentation)
   {
     viewer->setPointCloudRenderingProperties
         (pcl::visualization::PCL_VISUALIZER_OPACITY,1., "displayed cloud");
   }
-  viewer->addText ("press NUM1 to show/hide previous keypoints",0, 0, "t_prev");
-  viewer->addText ("press NUM2 to show/hide current keypoints",0, 10, "t_curr");
-  viewer->addText ("press NUM3 to switch between labelized/normal view of cloud",0, 20, "t_cloud");
-  viewer->addText ("press NUM4 to show/hide the computed transforms",0, 30, "t_trans");
-  viewer->addText ("press NUM5 to show/hide the unlabeled voxel centroid cloud",0, 40, "t_unlabeled");
-  viewer->addText ("press NUM6 to show/hide points at the center of disappeared/occluded supervoxels",0, 50, "t_dis");
-  viewer->addText ("press NUM7 to show the current segmentation w/ pairwise approach",0, 60, "t_seg");
+  viewer->addText ("press NUM1 to show/hide previous keypoints", 0, 0,
+                   "t_prev");
+  viewer->addText ("press NUM2 to show/hide current keypoints", 0, 10,
+                   "t_curr");
+  viewer->addText ("press NUM3 to switch between "
+                   "labelized/normal view of cloud", 0, 20, "t_cloud");
+  viewer->addText ("press NUM4 to show/hide the "
+                   "computed transforms", 0, 30, "t_trans");
+  viewer->addText ("press NUM5 to show/hide the "
+                   "unlabeled voxel centroid cloud", 0, 40, "t_unlabeled");
+  viewer->addText ("press NUM6 to show/hide points at the center "
+                   "of disappeared/occluded supervoxels", 0, 50, "t_dis");
+  viewer->addText ("press NUM7 to show the current segmentation "
+                   "w/ pairwise approach", 0, 60, "t_seg");
+  viewer->addText ("press NUM8 to show labels over each supervoxel of "
+                   "the over-segmented scene", 0, 70, "t_lab");
   if (manual_mode)
-  { viewer->addText ("press Enter to go to next frame",700, 0, 20, 1., 1., 1., "t_manual"); }
-  std::vector<int> current_keypoints_indices = super.current_keypoints_indices_;
-  std::vector<int> previous_keypoints_indices = super.previous_keypoints_indices_;
+  { viewer->addText ("press Enter to go to next frame", 700, 0, 20, 1., 1., 1.,
+                     "t_manual"); }
+  std::vector<int>
+      current_keypoints_indices = super.current_keypoints_indices_;
+  std::vector<int>
+      previous_keypoints_indices = super.previous_keypoints_indices_;
   if (frame_count)
   {
     // Show current keypoint cloud
@@ -181,7 +209,8 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer,
     if (show_prev)
     {
       // Get the previous voxel centroid cloud
-      PointCloudT::Ptr prev_voxel_centroid_cloud = super.getPrevVoxelCentroidCloud ();
+      PointCloudT::Ptr
+          prev_voxel_centroid_cloud = super.getPrevVoxelCentroidCloud ();
       for (const size_t& idx: super.previous_keypoints_indices_)
       {
         if (!viewer->updateSphere((*prev_voxel_centroid_cloud)[idx],
@@ -225,9 +254,9 @@ updateView (const pcl::visualization::PCLVisualizer::Ptr viewer,
       int count = 0;
       for (const auto& centroid: super.centroid_of_dynamic_svs_)
       {
-        if (!viewer->updateSphere(centroid, 0.002, 1., 1., 1., "to_track_"
+        if (!viewer->updateSphere(centroid, 0.005, 255/255., 192/255., 203/255., "to_track_"
                                   + std::to_string (count)))
-        { viewer->addSphere(centroid, 0.002, 1., 1., 1., "to_track_"
+        { viewer->addSphere(centroid, 0.005, 255/255., 192/255., 203/255., "to_track_"
                             + std::to_string (count)); ++count; }
       }
     }
@@ -249,6 +278,8 @@ main( int argc, char** argv )
                                "-z <spatial weight> \n"
                                "-n <normal_weight>\n"
                                "-t <time pause between frames>\n"
+                               "--noise <min number of neighbours in radius "
+                               "of each point to not be considered as noise>\n"
                                "--manual-mode", argv[0]);
     return 1;
   }
@@ -279,27 +310,28 @@ main( int argc, char** argv )
   if (pcl::console::find_switch(argc, argv, "-t"))
     pcl::console::parse (argc, argv, "-t", time_pause_in_ms);
 
+  uint64_t min_number_in_radius_for_noise_reduction = 25;
+  if (pcl::console::find_switch(argc, argv, "--noise"))
+    pcl::console::parse (argc, argv, "--noise",
+                         min_number_in_radius_for_noise_reduction);
+
   /* Point clouds from Kinect */
   // /!\ Empty constructor does nothing, need to call setGrabber
-  Getter<pcl::PointXYZRGBA> getter;
+#if USE_KINECT == 1
+#if KINECT_V2 == 1
   K2G k2g;
-  if (USE_KINECT)
-  {
-    if(KINECT_V2)
-    {
-      Processor freenectprocessor = OPENGL;
-      k2g.setProcessorAndStartRecording (freenectprocessor);
-      k2g.disableLog ();
-    }
-    else
-    {
-      // OpenNIGrabber, used to capture pointclouds from various rgbd cameras
-      boost::shared_ptr<pcl::Grabber>
-          grabber = boost::make_shared<pcl::OpenNIGrabber>();
-      // Getter Class to get the point cloud from various capturing devices
-      getter.setGrabber (grabber);
-    }
-  }
+  Processor freenectprocessor = OPENGL;
+  k2g.setProcessorAndStartRecording (freenectprocessor);
+  k2g.disableLog ();
+#else
+  Getter<pcl::PointXYZRGBA> getter;
+  // OpenNIGrabber, used to capture pointclouds from various rgbd cameras
+  boost::shared_ptr<pcl::Grabber>
+      grabber = boost::make_shared<pcl::OpenNIGrabber>();
+  // Getter Class to get the point cloud from various capturing devices
+  getter.setGrabber (grabber);
+#endif
+#endif
   // Pointcloud, used to store the cloud from the rgbd camera
   PointCloudT::Ptr cloud (new PointCloudT);
   // Tmp Pointcloud, used to store the cloud from the rgbd camera
@@ -313,24 +345,23 @@ main( int argc, char** argv )
 
   //.pcd Files
   // This is where clouds is filled
-  if (!USE_KINECT)
+#if USE_KINECT == 0
+  for(int i = 0 ; i < N_DATA ; i++)
   {
-    for(int i = 0 ; i < N_DATA ; i++)
+    PointCloudT::Ptr cloud(new PointCloudT);
+    //    std::string path = "../data/test" + std::to_string(i) + ".pcd";
+    std::string path = "../data/example_" + std::to_string(i) + ".pcd";
+    pcl::console::print_highlight (("Loading point cloud" + std::to_string(i) +
+                                    "...\n").c_str());
+    if (pcl::io::loadPCDFile<PointT> (path, *cloud))
     {
-      PointCloudT::Ptr cloud(new PointCloudT);
-      //    std::string path = "../data/test" + std::to_string(i) + ".pcd";
-      std::string path = "../data/example_" + std::to_string(i) + ".pcd";
-      pcl::console::print_highlight (("Loading point cloud" + std::to_string(i) +
-                                      "...\n").c_str());
-      if (pcl::io::loadPCDFile<PointT> (path, *cloud))
-      {
-        pcl::console::print_error (("Error loading cloud" + std::to_string(i) +
-                                    " file!\n").c_str());
-        return (1);
-      }
-      clouds.push_back(cloud);
+      pcl::console::print_error (("Error loading cloud" + std::to_string(i) +
+                                  " file!\n").c_str());
+      return (1);
     }
+    clouds.push_back(cloud);
   }
+#endif
   // Create a supervoxel clustering instance
   pcl::SequentialSVClustering<PointT> super (voxel_resolution, seed_resolution);
 
@@ -354,6 +385,10 @@ main( int argc, char** argv )
   // Create a pairwise segmentation instance
   PairwiseSegmentation pw_seg;
 
+  // Save data
+  std::ofstream csv_file;
+  csv_file.open ("../data/data_trunk.csv");
+  csv_file << "lost_labels,total,\n";
   while(!viewer->wasStopped ())
   {
     if (pcl::console::find_switch (argc, argv, "--manual-mode"))
@@ -362,30 +397,23 @@ main( int argc, char** argv )
     cloud.reset (new PointCloudT);
     tmp_cloud.reset (new PointCloudT);
     // Get the cloud
-    if (USE_KINECT)
-    {
-      if (KINECT_V2)
-      { copyPointCloud(*k2g.getCloud(), *tmp_cloud); }
-      else
-      { copyPointCloud(getter.getCloud(), *tmp_cloud); }
-    }
-    else
-    {
-      copyPointCloud(*clouds[frame_count%N_DATA], *tmp_cloud);
-    }
-    //    PointT pt1;
-    //    pt1.x = -0.35;
-    //    pt1.y = 0.5;
-    //    pt1.z = 1 - 0.1;
-    //    PointT pt2;
-    //    pt2.x = 0.35;
-    //    pt2.y = -0.25;
-    //    pt2.z = 1.25 - 0.02;
+#if USE_KINECT == 1
+#if KINECT_V2 == 1
+    { copyPointCloud(*k2g.getCloud(), *tmp_cloud); }
+#else
+    { copyPointCloud(getter.getCloud(), *tmp_cloud); }
+#endif
+#else
+    copyPointCloud(*clouds[frame_count%N_DATA], *tmp_cloud);
+#endif
+    //    PointT pt1, pt2;
+    //    pt1.x = -0.35; pt1.y = 0.5; pt1.z = 1 - 0.1;
+    //    pt2.x = 0.35; pt2.y = -0.25; pt2.z = 1.25 - 0.02;
     //    viewer->addLine (pt1, pt2, "test_line");
     //    viewer->addSphere(pt1, 0.005, 0, 255, 0, "start_test ");
     //    viewer->addSphere(pt2, 0.005, 255, 0, 0, "end_test ");
-    float minX = -0.35; float minY = -0.25; float minZ = 0.8;
-    float maxX = 0.35; float maxY = 0.5; float maxZ = 1.3;
+    float minX = -0.4; float minY = -0.35; float minZ = 0.8;
+    float maxX = 0.4; float maxY = 0.25; float maxZ = 1.3;
     pcl::CropBox<PointT> boxFilter;
     boxFilter.setMin(Eigen::Vector4f(minX, minY, minZ, 1.0));
     boxFilter.setMax(Eigen::Vector4f(maxX, maxY, maxZ, 1.0));
@@ -395,6 +423,13 @@ main( int argc, char** argv )
     // If a cloud got captured from the device
     if(!cloud->empty())
     {
+      // Filter the noise from the input pointcloud
+      pcl::RadiusOutlierRemoval<PointT> rorfilter;
+      rorfilter.setInputCloud (cloud);
+      rorfilter.setRadiusSearch (2*voxel_resolution);
+      rorfilter.setMinNeighborsInRadius
+          (min_number_in_radius_for_noise_reduction);
+      rorfilter.filter (*cloud);
 
       super.setInputCloud(boost::make_shared<PointCloudT>(*cloud));
 
@@ -404,6 +439,7 @@ main( int argc, char** argv )
 
       // Interactive segmentation
       std::vector <uint32_t> to_reset_parts = super.getToResetParts ();
+      csv_file << to_reset_parts << "," << supervoxel_clusters.size () << ",\n";
       pw_seg.resetParts (to_reset_parts);
       std::vector <uint32_t> moving_parts = super.getMovingParts ();
       pw_seg.update (moving_parts, frame_count);
@@ -419,6 +455,14 @@ main( int argc, char** argv )
         std::cout << "\b\b] ";
       }
       std::cout << "\n";
+      std::cout << "Clusters size:\n";
+      int tot = 0;
+      for (const auto& pair: curr_seg)
+      {
+        tot += pair.second.size ();
+        std::cout << pair.second.size () << " ";
+      }
+      std::cout << "total: " << tot << "\n";
 
       pcl::console::print_info ("Found %d supervoxels\n",
                                 supervoxel_clusters.size ());
@@ -437,7 +481,11 @@ main( int argc, char** argv )
       ++frame_count;
     }
   }
-  if (USE_KINECT && KINECT_V2)
-  { k2g.shutDown(); }
-  return 0;
+#if USE_KINECT == 1
+#if KINECT_V2 == 1
+  k2g.shutDown ();
+#endif
+#endif
+  csv_file.close ();
+  return (0);
 }

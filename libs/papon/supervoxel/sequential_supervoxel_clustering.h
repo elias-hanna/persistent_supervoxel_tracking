@@ -132,7 +132,7 @@ namespace pcl
       std::vector<int> previous_keypoints_indices_;
       std::vector<int> current_keypoints_indices_;
       std::vector<pcl::PointXYZRGBA> centroid_of_dynamic_svs_;
-
+      uint64_t frame_number_;
       std::vector<uint32_t>
       getLabelColors () const;
 
@@ -743,7 +743,7 @@ namespace pcl
       /** \brief Stores the resolution used in the octree */
       float resolution_;
 
-      /** \brief Stores the resolution used to seed the superpixels */
+      /** \brief Stores the resolution used to seed the supervoxels */
       float seed_resolution_;
 
       /** \brief Contains a KDtree for the voxelized cloud */

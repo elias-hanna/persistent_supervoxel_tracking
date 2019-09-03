@@ -108,7 +108,7 @@ namespace pcl
                 void
                 resetPointCount ()
                 {
-                    num_prev_= num_points_;
+//                    num_prev_= num_points_;
                     num_points_ = 0;
                 }
 
@@ -182,7 +182,7 @@ namespace pcl
                 reset ()
                 {
                     neighbors_.clear ();
-                    num_points_ = num_prev_ = 0;
+                    num_points_ = 0;//num_prev_ = 0;
                     data_ = DataT ();
                 }
 
@@ -215,7 +215,7 @@ namespace pcl
 
             private:
                 int num_points_;
-                int num_prev_;
+//                int num_prev_;
                 NeighborListT neighbors_;
                 DataT data_;
         };
