@@ -310,7 +310,7 @@ main( int argc, char** argv )
   if (pcl::console::find_switch(argc, argv, "-t"))
     pcl::console::parse (argc, argv, "-t", time_pause_in_ms);
 
-  uint64_t min_number_in_radius_for_noise_reduction = 25;
+  uint64_t min_number_in_radius_for_noise_reduction = 20;
   if (pcl::console::find_switch(argc, argv, "--noise"))
     pcl::console::parse (argc, argv, "--noise",
                          min_number_in_radius_for_noise_reduction);

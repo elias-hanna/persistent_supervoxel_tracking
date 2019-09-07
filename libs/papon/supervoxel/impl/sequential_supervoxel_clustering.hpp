@@ -982,9 +982,9 @@ computeUniformKeypointsAndFPFHCIELabDescriptors
   // Get the labels that need to be tracked
   std::vector<uint32_t> labels_to_track =
       getLabelsOfDynamicSV (supervoxel_clusters);
-  for (const auto& label: labels_to_track)
-  { std::cout << "to track: " << label << "\n"; }
-
+//  for (const auto& label: labels_to_track)
+//  { std::cout << "to track: " << label << "\n"; }
+  std::cout << "nb of svs to track: " << labels_to_track.size () << "\n";
   for (const auto& label: labels_to_track)
   {
     PointCloudScale::Ptr keypoints (new PointCloudScale);
