@@ -265,8 +265,8 @@ namespace pcl
       // Feature space search types
 //      typedef pcl::FPFHSignature33 FeatureT;
       typedef pcl::FPFHCIELabSignature36 FeatureT;
-      typedef flann::L1<float> DistanceT; // Manhattan distance
-      //typedef flann::L2<float> DistanceT;
+//      typedef flann::L1<float> DistanceT; // Manhattan distance
+      typedef flann::L2<float> DistanceT;
       //typedef flann::KL_Divergence<float> DistanceT;
       //typedef flann::MinkowskiDistance<float> DistanceT;
       //typedef flann::HistIntersectionDistance<float> DistanceT;
@@ -570,7 +570,8 @@ namespace pcl
        * \param[out] matches found in the form of an STL unordered map with
        * label as key and pcl::recognition::ObjRecRANSAC::Output as value
        */
-      std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>
+//      std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>
+      std::unordered_map<uint32_t, std::vector<float>>
       getMatchesRANSAC (SequentialSVMapT &supervoxel_clusters);
 
       /** \brief This method computes the keypoints and the descriptors of the

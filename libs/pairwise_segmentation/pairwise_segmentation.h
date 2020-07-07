@@ -71,7 +71,7 @@ class PairwiseSegmentation
      */
     void
     updateComovementCounts (const std::vector<uint32_t>& moving_parts_labels,
-                            const int frame_count);
+                            const uint64_t frame_count);
     GlobalCounter comovement_counts_;
     /**
      * @brief current_segmentation_ current grouping of parts

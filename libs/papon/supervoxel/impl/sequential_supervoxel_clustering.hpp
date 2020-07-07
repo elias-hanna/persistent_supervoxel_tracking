@@ -42,6 +42,7 @@
 
 #include "../sequential_supervoxel_clustering.h"
 #include <boost/interprocess/sync/scoped_lock.hpp>
+#include <boost/bind.hpp>
 
 #define NUM_THREADS 1
 
@@ -1160,14 +1161,16 @@ pcl::SequentialSVClustering<PointT>::testForOcclusionCriterium
 }
 ///////////////////////////////////////////////////////////////////////////////
 template <typename PointT>
-std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>
+//std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>
+std::unordered_map<uint32_t, std::vector<float>>
 pcl::SequentialSVClustering<PointT>::getMatchesRANSAC
 (SequentialSVMapT &supervoxel_clusters)
 {
   moving_parts_.clear ();
   to_reset_parts_.clear ();
   // This will store the transforms that are valid
-  std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>> found_transforms;
+//  std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>> found_transforms;
+  std::unordered_map<uint32_t, std::vector<float>> found_transforms;
   // previous_keypoints is a map where the key is the label of the concerned
   // supervoxel, and the value is a pair consisting as first element of the
   // Indices of the keypoints in the previous voxel centroid cloud and as
@@ -1181,7 +1184,7 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC
   int min_number_of_inliers = 3;
   float proba_of_pure_inlier = 0.99f;
   int num_max_iter = 100; // Same as in Van Hoof paper
-  float threshold = 100.f;
+  float threshold = 1000.f;
   std::vector<uint32_t> labels;
   if(getMaxLabel() > 0)
   {
@@ -1193,7 +1196,6 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC
                                                    previous_keypoints,
                                                    min_number_of_inliers))
     {
-
       // Compute keypoints and descriptors for current cloud
 //      if (!computeUniformKeypointsAndFPFHDescriptors (current_keypoints,
 //                                                 min_number_of_inliers))
@@ -1221,6 +1223,7 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC
                                    threshold,
                                    seed_resolution_);
         parallel_reduce(tbb::blocked_range<size_t>(0,num_max_iter), result );
+        // If a potential match was found
         if(result.best_score_ > 0)
         {
           if (testForOcclusionCriterium (*(pair.second.first),
@@ -1230,9 +1233,18 @@ pcl::SequentialSVClustering<PointT>::getMatchesRANSAC
                       << " was matched and the found transform has a score of "
                       << result.best_score_ << " and "
                       << result.best_inliers_set_.size () << " inliers.\n";
+//            found_transforms.insert (std::pair
+//                                     <uint32_t, Eigen::Matrix<float, 4, 4>>
+//                                     (pair.first, result.best_fit_));
+            // Below is a hotfix to an unkown bug
+            std::vector<float> transform_matrix;
+            for (int i = 0; i < 16; ++i)
+            {
+                transform_matrix.push_back (result.best_fit_(i));
+            }
             found_transforms.insert (std::pair
-                                     <uint32_t, Eigen::Matrix<float, 4, 4>>
-                                     (pair.first, result.best_fit_));
+                                     <uint32_t, std::vector<float>>
+                                     (pair.first, transform_matrix));
             labels.push_back(pair.first);
             moving_parts_.push_back (pair.first);
             removeInliers (current_keypoints, result.best_inliers_set_);
@@ -1266,7 +1278,9 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints
 (SequentialSVMapT &supervoxel_clusters,
  std::vector<int>& existing_seed_indices)
 {
-  std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>> matches =
+//  std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>> matches =
+//      getMatchesRANSAC (supervoxel_clusters);
+  std::unordered_map<uint32_t, std::vector<float>> matches =
       getMatchesRANSAC (supervoxel_clusters);
   lines_.clear ();
 
@@ -1295,7 +1309,9 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints
         nb_of_points += 1;
       }
     }
-    std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>::iterator
+//    std::unordered_map<uint32_t, Eigen::Matrix<float, 4, 4>>::iterator
+//        unmap_matches_it = matches.find (label);
+    std::unordered_map<uint32_t, std::vector<float>>::iterator
         unmap_matches_it = matches.find (label);
     Eigen::Vector4f prev_centroid;
     Eigen::Vector4f new_centroid;
@@ -1308,7 +1324,14 @@ pcl::SequentialSVClustering<PointT>::getPreviousSeedingPoints
           prev_centroid_tmp.y,
           prev_centroid_tmp.z,
           1;
-      new_centroid = unmap_matches_it->second*prev_centroid;
+      // Hot fix
+      Eigen::Matrix4f transform;
+      for (int i = 0; i < 16; ++i)
+      {
+          transform(i) = unmap_matches_it->second[i];
+      }
+//      new_centroid = unmap_matches_it->second*prev_centroid;
+      new_centroid = transform*prev_centroid;
       // Compute new centroid from matching method transform
       centroid.getVector3fMap () = new_centroid.head<3> ();
     }
@@ -1442,12 +1465,14 @@ pcl::SequentialSVClustering<PointT>::addHelpersFromUnlabeledSeedIndices
       // corresponding to the considered seed point
       supervoxel_helpers_.push_back
           (new SequentialSupervoxelHelper(available_labels.back(),this));
+      to_reset_parts_.push_back (available_labels.back ());
       available_labels.pop_back();
     }
     else
     {
       supervoxel_helpers_.push_back
           (new SequentialSupervoxelHelper(++max_label,this));
+      to_reset_parts_.push_back (max_label);
     }
     // Find which leaf corresponds to this seed index
     LeafContainerT* seed_leaf = sequential_octree_->at(seed_indices[i]);

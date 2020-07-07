@@ -37,7 +37,7 @@ PairwiseSegmentation::PairwiseSegmentation (const std::vector<uint32_t>&
 void
 PairwiseSegmentation::updateComovementCounts (const std::vector<uint32_t>&
                                               moving_parts_labels,
-                                              const int frame_count)
+                                              const uint64_t frame_count)
 {
   for (const uint32_t moving_part_label: moving_parts_labels)
   {
@@ -75,20 +75,26 @@ PairwiseSegmentation::updateComovementCounts (const std::vector<uint32_t>&
         bool flag = true;
         if (counter_it == moving_part_counter.end ())
         {
-          if(comovement_counts_.find (other_part_label)
+          if (comovement_counts_.find (other_part_label)
              != comovement_counts_.end ())
           {
-            if (comovement_counts_.at (other_part_label).find (moving_part_label)
-                != comovement_counts_.at (other_part_label). end ())
+            if (comovement_counts_.at (other_part_label).size () != 0)
             {
-              if (comovement_counts_.at (other_part_label).at(moving_part_label)
-                  != 1)
-              {
-                moving_part_counter.insert
-                    (std::pair <uint32_t, int> (other_part_label, 1 - frame_count));
-                flag = false;
-              }
+              moving_part_counter.insert
+                  (std::pair <uint32_t, int> (other_part_label, 2 - frame_count));
+              flag = false;
             }
+//            if (comovement_counts_.at (other_part_label).find (moving_part_label)
+//                != comovement_counts_.at (other_part_label). end ())
+//            {
+//              if (comovement_counts_.at (other_part_label).at(moving_part_label)
+//                  != 1)
+//              {
+//                moving_part_counter.insert
+//                    (std::pair <uint32_t, int> (other_part_label, 2 - frame_count));
+//                flag = false;
+//              }
+//            }
           }
           if (flag)
           {

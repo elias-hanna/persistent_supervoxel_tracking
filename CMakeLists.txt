@@ -32,6 +32,15 @@ set(HEADERS
 # Notre exécutable
 add_executable(persistent_supervoxelization ${SRCS} ${HEADERS})
 
+######################### VTK Library #########################
+SET(VTK_DIR "$ENV{HOME}/git/VTK-7.1.1.OSID_ubuntu-18.04.installtree/lib/cmake/vtk-7.1" CACHE PATH "VTK directory override" FORCE)
+#set(VTK_DIR "$ENV{HOME}/git/VTK-8.2.0.OSID_ubuntu-18.04.installtree/lib/cmake/vtk-8.2")
+find_package(VTK REQUIRED)
+target_include_directories(persistent_supervoxelization PUBLIC ${VTK_INCLUDE_DIRS})
+target_link_libraries(persistent_supervoxelization ${VTK_LIBS})
+
+message("VTK found: " + ${VTK_INCLUDE_DIRS} + ", version: " + ${VTK_VERSION})
+
 # Link local libraries
 target_link_libraries(persistent_supervoxelization  #lib_tracker
                             lib_papon)

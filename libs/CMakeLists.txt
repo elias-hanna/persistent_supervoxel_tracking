@@ -77,6 +77,16 @@ add_library(lib_papon ${SRCS_PAPON} ${HEADERS_PAPON} ${IMPL_HEADERS_PAPON})
 # Add libraries (directories with sources files)
 #add_library(lib_RANSAC ${SRCS_RANSAC} ${HEADERS_RANSAC} ${IMPL_HEADERS_RANSAC})
 
+######################### VTK Library #########################
+
+#set(VTK_DIR "$ENV{HOME}/git/VTK-8.2.0.OSID_ubuntu-18.04.installtree/lib/cmake/vtk-8.2")
+SET(VTK_DIR "$ENV{HOME}/git/VTK-7.1.1.OSID_ubuntu-18.04.installtree/lib/cmake/vtk-7.1" CACHE PATH "VTK directory override" FORCE)
+find_package(VTK REQUIRED)
+target_include_directories(lib_papon PUBLIC ${VTK_INCLUDE_DIRS})
+target_link_libraries(lib_papon ${VTK_LIBS})
+
+message("VTK found: " + ${VTK_INCLUDE_DIRS} + ", version: " + ${VTK_VERSION})
+
 ########################### PCL Library ##########################
 # Check for extern dependecies
 find_package (PCL 1.9 REQUIRED)
@@ -93,6 +103,24 @@ else ()
   # Sinon, nous affichons un message
   message(FATAL_ERROR "PCL not found")
 endif ()
+
+########################### Eigen3 Library ##########################
+# Check for extern dependecies
+# find_package (Eigen3 3.3 REQUIRED NO_MODULE)
+
+# if (Eigen3_FOUND)
+#   # Une fois la dépendance trouvée, nous l'incluons au projet
+#   target_include_directories(lib_papon PUBLIC ${Eigen3_INCLUDE_DIRS})
+#   target_link_libraries (lib_papon ${Eigen3_LIBRARIES})
+# #  target_include_directories(lib_tracker PUBLIC ${PCL_INCLUDE_DIRS})
+# #  target_link_libraries (lib_tracker ${PCL_LIBRARIES})
+# #  target_include_directories(lib_RANSAC PUBLIC ${PCL_INCLUDE_DIRS})
+# #  target_link_libraries (lib_RANSAC ${PCL_LIBRARIES})
+# else ()
+#   # Sinon, nous affichons un message
+#   message(FATAL_ERROR "Eigen3 not found")
+# endif ()
+
 
 #find_package(OpenMP)
 #if (OpenMP_FOUND)
